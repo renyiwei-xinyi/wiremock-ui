@@ -75,6 +75,17 @@ git pull origin master
 
 ## 🐛 故障排除
 
+### Docker 构建失败
+如果遇到镜像拉取或构建错误：
+```bash
+# 使用修复脚本
+chmod +x fix-docker.sh
+./fix-docker.sh
+
+# 然后重新部署
+./deploy.sh start
+```
+
 ### 脚本权限问题
 如果遇到 "bad interpreter" 错误：
 ```bash
