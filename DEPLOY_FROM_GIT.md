@@ -13,6 +13,8 @@ chmod +x deploy.sh
 ```
 
 ### 2. 一键部署
+
+#### 方案A：标准部署（国外网络环境）
 ```bash
 # 构建并启动服务
 ./deploy.sh build
@@ -20,6 +22,22 @@ chmod +x deploy.sh
 
 # 验证部署
 ./deploy.sh health
+```
+
+#### 方案B：中国网络环境优化部署（推荐）
+```bash
+# 设置权限
+chmod +x deploy-china.sh
+
+# 配置 Docker 镜像加速器
+./deploy-china.sh mirror
+
+# 构建并启动服务
+./deploy-china.sh build
+./deploy-china.sh start
+
+# 验证部署
+./deploy-china.sh health
 ```
 
 ### 3. 访问应用
