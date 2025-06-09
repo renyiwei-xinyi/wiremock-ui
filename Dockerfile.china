@@ -1,5 +1,5 @@
-# 使用阿里云镜像源的 Node.js 18 Alpine 镜像作为基础镜像
-FROM registry.cn-hangzhou.aliyuncs.com/library/node:18-alpine AS builder
+# 使用官方 Node.js 18 Alpine 镜像作为基础镜像（通过镜像加速器拉取）
+FROM node:18-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -21,8 +21,8 @@ COPY vite.config.js ./
 # 构建应用
 RUN npm run build
 
-# 使用阿里云镜像源的 nginx 作为生产环境服务器
-FROM registry.cn-hangzhou.aliyuncs.com/library/nginx:alpine
+# 使用官方 nginx 镜像作为生产环境服务器（通过镜像加速器拉取）
+FROM nginx:alpine
 
 # 复制构建产物到 nginx 目录
 COPY --from=builder /app/dist /usr/share/nginx/html
