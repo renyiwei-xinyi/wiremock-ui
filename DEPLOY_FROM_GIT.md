@@ -40,13 +40,22 @@ chmod +x deploy-china.sh
 ./deploy-china.sh health
 ```
 
-#### 方案C：简化部署（推荐 - 绕过网络问题）
+#### 方案C：简化部署（绕过网络问题）
 ```bash
 # 设置权限
 chmod +x deploy-simple.sh
 
 # 一键部署（本地构建 + Docker 运行）
 ./deploy-simple.sh deploy
+```
+
+#### 方案D：开发服务器（推荐 - 最简单，无需 nginx）
+```bash
+# 设置权限
+chmod +x deploy-dev.sh
+
+# 启动开发服务器
+./deploy-dev.sh start
 ```
 
 ### 3. 访问应用
