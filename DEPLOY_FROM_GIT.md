@@ -24,7 +24,7 @@ chmod +x deploy.sh
 ./deploy.sh health
 ```
 
-#### 方案B：中国网络环境优化部署（推荐）
+#### 方案B：中国网络环境优化部署
 ```bash
 # 设置权限
 chmod +x deploy-china.sh
@@ -38,6 +38,15 @@ chmod +x deploy-china.sh
 
 # 验证部署
 ./deploy-china.sh health
+```
+
+#### 方案C：简化部署（推荐 - 绕过网络问题）
+```bash
+# 设置权限
+chmod +x deploy-simple.sh
+
+# 一键部署（本地构建 + Docker 运行）
+./deploy-simple.sh deploy
 ```
 
 ### 3. 访问应用
