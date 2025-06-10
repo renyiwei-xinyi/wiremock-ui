@@ -327,7 +327,40 @@ const Requests = () => {
                   <Editor
                     height="300px"
                     defaultLanguage="json"
-                    value={JSON.stringify(selectedRequest.response, null, 2)}
+                    value={JSON.stringify({
+                      ...selectedRequest.response,
+                      // 格式化body字段，去除转义
+                      body: selectedRequest.response.body ? 
+                        (typeof selectedRequest.response.body === 'string' ? 
+                          (() => {
+                            try {
+                              return JSON.parse(selectedRequest.response.body);
+                            } catch {
+                              return selectedRequest.response.body;
+                            }
+                          })() : selectedRequest.response.body
+                        ) : undefined,
+                      // 移除bodyAsBase64字段
+                      bodyAsBase64: undefined
+                    }, null, 2)}
+                    options={{
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                    }}
+                  />
+                </div>
+              </>
+            )}
+            
+            {selectedRequest.postServeActions && selectedRequest.postServeActions.length > 0 && (
+              <>
+                <Title level={4} style={{ marginTop: 24 }}>Webhook 回调</Title>
+                <div className="json-editor">
+                  <Editor
+                    height="200px"
+                    defaultLanguage="json"
+                    value={JSON.stringify(selectedRequest.postServeActions, null, 2)}
                     options={{
                       readOnly: true,
                       minimap: { enabled: false },

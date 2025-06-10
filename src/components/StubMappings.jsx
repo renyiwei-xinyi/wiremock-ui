@@ -50,6 +50,7 @@ const StubMappings = () => {
   const [selectedMapping, setSelectedMapping] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [form] = Form.useForm();
 
   // 键值对编辑器组件
@@ -313,12 +314,20 @@ const StubMappings = () => {
   // 导出映射
   const handleExport = () => {
     try {
-      const dataStr = JSON.stringify({ mappings }, null, 2);
+      let exportMappings = mappings;
+      let fileName = 'wiremock-mappings-all';
+      
+      if (selectedRowKeys.length > 0) {
+        exportMappings = mappings.filter(mapping => selectedRowKeys.includes(mapping.id));
+        fileName = 'wiremock-mappings-selected';
+      }
+      
+      const dataStr = JSON.stringify({ mappings: exportMappings }, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `wiremock-mappings-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `${fileName}-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -326,7 +335,7 @@ const StubMappings = () => {
       
       notification.success({
         message: '导出成功',
-        description: '映射文件已下载',
+        description: `已导出 ${exportMappings.length} 个映射配置`,
       });
     } catch (error) {
       notification.error({
@@ -520,16 +529,34 @@ const StubMappings = () => {
       </div>
 
       <Card className="content-card">
+        <div style={{ marginBottom: 16, padding: 16, backgroundColor: '#f6f8fa', borderRadius: 6 }}>
+          <Title level={4} style={{ margin: '0 0 8px 0' }}>💡 映射配置说明</Title>
+          <Text type="secondary">
+            映射配置是 WireMock 的核心功能，用于定义如何匹配传入的 HTTP 请求并返回相应的响应。
+            每个映射包含请求匹配条件（URL、方法、头部等）和响应配置（状态码、响应体、延时等）。
+            您可以创建多个映射来模拟不同的 API 端点，支持正则表达式匹配、场景状态管理和 Webhook 回调。
+          </Text>
+        </div>
+        
         <Table
           columns={columns}
           dataSource={filteredMappings}
           rowKey="id"
           loading={loading}
+          rowSelection={{
+            selectedRowKeys,
+            onChange: setSelectedRowKeys,
+            selections: [
+              Table.SELECTION_ALL,
+              Table.SELECTION_INVERT,
+              Table.SELECTION_NONE,
+            ],
+          }}
           pagination={{
             total: filteredMappings.length,
             showSizeChanger: true,
             showQuickJumper: true,
-            showTotal: (total) => `共 ${total} 条记录`,
+            showTotal: (total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条记录${selectedRowKeys.length > 0 ? `，已选择 ${selectedRowKeys.length} 条` : ''}`,
           }}
         />
       </Card>
