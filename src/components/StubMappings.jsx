@@ -16,6 +16,11 @@ import {
   Row,
   Col,
   Divider,
+  Tabs,
+  InputNumber,
+  Upload,
+  Collapse,
+  Descriptions,
 } from 'antd';
 import {
   PlusOutlined,
@@ -24,16 +29,19 @@ import {
   EyeOutlined,
   ReloadOutlined,
   SearchOutlined,
-  ClearOutlined,
-  ExportOutlined,
-  ImportOutlined,
+  CopyOutlined,
+  DownloadOutlined,
+  UploadOutlined,
+  MinusCircleOutlined,
 } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
 import { stubMappingsApi } from '../services/wiremockApi';
 
 const { Title, Text } = Typography;
-const { Search } = Input;
+const { Search, TextArea } = Input;
 const { Option } = Select;
+const { TabPane } = Tabs;
+const { Panel } = Collapse;
 
 const StubMappings = () => {
   const [mappings, setMappings] = useState([]);
@@ -43,6 +51,79 @@ const StubMappings = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [form] = Form.useForm();
+
+  // 键值对编辑器组件
+  const KeyValueEditor = ({ value = {}, onChange, placeholder }) => {
+    const [pairs, setPairs] = useState([]);
+
+    useEffect(() => {
+      const entries = Object.entries(value || {});
+      if (entries.length === 0) {
+        setPairs([{ key: '', value: '', id: Math.random() }]);
+      } else {
+        setPairs(entries.map(([key, val]) => ({ key, value: val, id: Math.random() })));
+      }
+    }, [value]);
+
+    const handleChange = (newPairs) => {
+      setPairs(newPairs);
+      const obj = {};
+      newPairs.forEach(pair => {
+        if (pair.key && pair.value) {
+          obj[pair.key] = pair.value;
+        }
+      });
+      onChange?.(obj);
+    };
+
+    const addPair = () => {
+      handleChange([...pairs, { key: '', value: '', id: Math.random() }]);
+    };
+
+    const removePair = (id) => {
+      handleChange(pairs.filter(pair => pair.id !== id));
+    };
+
+    const updatePair = (id, field, newValue) => {
+      handleChange(pairs.map(pair => 
+        pair.id === id ? { ...pair, [field]: newValue } : pair
+      ));
+    };
+
+    return (
+      <div>
+        {pairs.map((pair) => (
+          <Row key={pair.id} gutter={8} style={{ marginBottom: 8 }}>
+            <Col span={10}>
+              <Input
+                placeholder="键"
+                value={pair.key}
+                onChange={(e) => updatePair(pair.id, 'key', e.target.value)}
+              />
+            </Col>
+            <Col span={12}>
+              <Input
+                placeholder="值"
+                value={pair.value}
+                onChange={(e) => updatePair(pair.id, 'value', e.target.value)}
+              />
+            </Col>
+            <Col span={2}>
+              <Button
+                type="text"
+                danger
+                icon={<MinusCircleOutlined />}
+                onClick={() => removePair(pair.id)}
+              />
+            </Col>
+          </Row>
+        ))}
+        <Button type="dashed" onClick={addPair} block>
+          添加 {placeholder || '键值对'}
+        </Button>
+      </div>
+    );
+  };
 
   // 获取所有映射
   const fetchMappings = async () => {
@@ -69,17 +150,31 @@ const StubMappings = () => {
     setSelectedMapping(null);
     form.resetFields();
     form.setFieldsValue({
+      name: '',
+      priority: 5,
+      scenarioName: '',
+      requiredScenarioState: '',
+      newScenarioState: '',
+      comment: '',
       request: {
         method: 'GET',
-        url: '/',
+        urlPath: '/',
+        urlPathPattern: '',
+        queryParameters: {},
+        headers: { 'Content-Type': 'application/json' },
+        cookies: {},
+        basicAuth: { username: '', password: '' },
+        body: ''
       },
       response: {
         status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        statusMessage: '',
+        headers: { 'Content-Type': 'application/json' },
         body: '{}',
+        fixedDelayMilliseconds: 0,
+        delayDistribution: { type: 'uniform', lower: 0, upper: 0 }
       },
+      postServeActions: []
     });
     setModalVisible(true);
   };
@@ -87,7 +182,42 @@ const StubMappings = () => {
   // 编辑映射
   const handleEdit = (record) => {
     setSelectedMapping(record);
-    form.setFieldsValue(record);
+    form.setFieldsValue({
+      ...record,
+      request: {
+        method: 'GET',
+        urlPath: '/',
+        urlPathPattern: '',
+        queryParameters: {},
+        headers: { 'Content-Type': 'application/json' },
+        cookies: {},
+        basicAuth: { username: '', password: '' },
+        body: '',
+        ...record.request
+      },
+      response: {
+        status: 200,
+        statusMessage: '',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+        fixedDelayMilliseconds: 0,
+        delayDistribution: { type: 'uniform', lower: 0, upper: 0 },
+        ...record.response
+      },
+      postServeActions: record.postServeActions || []
+    });
+    setModalVisible(true);
+  };
+
+  // 复制映射
+  const handleCopy = (record) => {
+    const copiedMapping = {
+      ...record,
+      name: `${record.name || 'Copy'} - 副本`,
+      id: undefined
+    };
+    setSelectedMapping(null);
+    form.setFieldsValue(copiedMapping);
     setModalVisible(true);
   };
 
@@ -117,14 +247,44 @@ const StubMappings = () => {
   // 保存映射
   const handleSave = async (values) => {
     try {
+      const cleanedValues = {
+        ...values,
+        request: {
+          ...values.request,
+          queryParameters: Object.keys(values.request.queryParameters || {}).length > 0 
+            ? values.request.queryParameters : undefined,
+          headers: Object.keys(values.request.headers || {}).length > 0 
+            ? values.request.headers : undefined,
+          cookies: Object.keys(values.request.cookies || {}).length > 0 
+            ? values.request.cookies : undefined,
+          basicAuth: (values.request.basicAuth?.username || values.request.basicAuth?.password) 
+            ? values.request.basicAuth : undefined,
+          body: values.request.body || undefined
+        },
+        response: {
+          ...values.response,
+          headers: Object.keys(values.response.headers || {}).length > 0 
+            ? values.response.headers : undefined,
+          fixedDelayMilliseconds: values.response.fixedDelayMilliseconds > 0 
+            ? values.response.fixedDelayMilliseconds : undefined,
+          delayDistribution: (values.response.delayDistribution?.lower > 0 || values.response.delayDistribution?.upper > 0)
+            ? values.response.delayDistribution : undefined
+        },
+        postServeActions: values.postServeActions?.length > 0 ? values.postServeActions : undefined,
+        scenarioName: values.scenarioName || undefined,
+        requiredScenarioState: values.requiredScenarioState || undefined,
+        newScenarioState: values.newScenarioState || undefined,
+        comment: values.comment || undefined
+      };
+
       if (selectedMapping) {
-        await stubMappingsApi.update(selectedMapping.id, values);
+        await stubMappingsApi.update(selectedMapping.id, cleanedValues);
         notification.success({
           message: '更新成功',
           description: '映射已成功更新',
         });
       } else {
-        await stubMappingsApi.create(values);
+        await stubMappingsApi.create(cleanedValues);
         notification.success({
           message: '创建成功',
           description: '映射已成功创建',
@@ -140,53 +300,69 @@ const StubMappings = () => {
     }
   };
 
-  // 清空所有映射
-  const handleClearAll = async () => {
+  // 导出映射
+  const handleExport = () => {
     try {
-      await stubMappingsApi.deleteAll();
+      const dataStr = JSON.stringify({ mappings }, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `wiremock-mappings-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
       notification.success({
-        message: '清空成功',
-        description: '所有映射已被删除',
+        message: '导出成功',
+        description: '映射文件已下载',
       });
-      fetchMappings();
     } catch (error) {
       notification.error({
-        message: '清空失败',
+        message: '导出失败',
         description: error.message,
       });
     }
   };
 
-  // 重置映射
-  const handleReset = async () => {
-    try {
-      await stubMappingsApi.reset();
-      notification.success({
-        message: '重置成功',
-        description: '映射已重置到初始状态',
-      });
-      fetchMappings();
-    } catch (error) {
-      notification.error({
-        message: '重置失败',
-        description: error.message,
-      });
-    }
+  // 导入映射
+  const handleImport = (file) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const importData = JSON.parse(e.target.result);
+        const importMappings = importData.mappings || [importData];
+        
+        for (const mapping of importMappings) {
+          delete mapping.id;
+          await stubMappingsApi.create(mapping);
+        }
+        
+        notification.success({
+          message: '导入成功',
+          description: `成功导入 ${importMappings.length} 个映射`,
+        });
+        fetchMappings();
+      } catch (error) {
+        notification.error({
+          message: '导入失败',
+          description: '文件格式错误或导入过程中出现问题',
+        });
+      }
+    };
+    reader.readAsText(file);
+    return false;
   };
 
   // 获取方法标签样式
   const getMethodTag = (method) => {
     const colors = {
-      GET: 'blue',
-      POST: 'green',
-      PUT: 'orange',
-      DELETE: 'red',
-      PATCH: 'purple',
-      HEAD: 'cyan',
-      OPTIONS: 'magenta',
+      GET: 'blue', POST: 'green', PUT: 'orange', DELETE: 'red',
+      PATCH: 'purple', HEAD: 'cyan', OPTIONS: 'magenta',
     };
     return (
-      <Tag color={colors[method] || 'default'} className={`method-${method?.toLowerCase()}`}>
+      <Tag color={colors[method] || 'default'}>
         {method}
       </Tag>
     );
@@ -197,9 +373,10 @@ const StubMappings = () => {
     if (!searchText) return true;
     const searchLower = searchText.toLowerCase();
     return (
-      mapping.request?.url?.toLowerCase().includes(searchLower) ||
+      mapping.request?.urlPath?.toLowerCase().includes(searchLower) ||
       mapping.request?.method?.toLowerCase().includes(searchLower) ||
-      mapping.name?.toLowerCase().includes(searchLower)
+      mapping.name?.toLowerCase().includes(searchLower) ||
+      mapping.comment?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -208,7 +385,16 @@ const StubMappings = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      render: (text, record) => text || `${record.request?.method} ${record.request?.url}`,
+      render: (text, record) => (
+        <div>
+          <div>{text || `${record.request?.method} ${record.request?.urlPath}`}</div>
+          {record.comment && (
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {record.comment}
+            </Text>
+          )}
+        </div>
+      ),
     },
     {
       title: '方法',
@@ -219,7 +405,7 @@ const StubMappings = () => {
     },
     {
       title: 'URL',
-      dataIndex: ['request', 'url'],
+      dataIndex: ['request', 'urlPath'],
       key: 'url',
       render: (url) => <Text code>{url}</Text>,
     },
@@ -242,35 +428,28 @@ const StubMappings = () => {
       render: (priority) => priority || 5,
     },
     {
+      title: '场景',
+      dataIndex: 'scenarioName',
+      key: 'scenario',
+      width: 100,
+      render: (scenario) => scenario ? <Tag color="blue">{scenario}</Tag> : '-',
+    },
+    {
       title: '操作',
       key: 'actions',
-      width: 200,
+      width: 250,
       render: (_, record) => (
         <Space>
-          <Button
-            type="text"
-            icon={<EyeOutlined />}
-            onClick={() => handleView(record)}
-            title="查看详情"
-          />
-          <Button
-            type="text"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-            title="编辑"
-          />
+          <Button type="text" icon={<EyeOutlined />} onClick={() => handleView(record)} title="查看详情" />
+          <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} title="编辑" />
+          <Button type="text" icon={<CopyOutlined />} onClick={() => handleCopy(record)} title="复制" />
           <Popconfirm
             title="确定要删除这个映射吗？"
             onConfirm={() => handleDelete(record.id)}
             okText="确定"
             cancelText="取消"
           >
-            <Button
-              type="text"
-              danger
-              icon={<DeleteOutlined />}
-              title="删除"
-            />
+            <Button type="text" danger icon={<DeleteOutlined />} title="删除" />
           </Popconfirm>
         </Space>
       ),
@@ -305,32 +484,18 @@ const StubMappings = () => {
           <Button icon={<ReloadOutlined />} onClick={fetchMappings} loading={loading}>
             刷新
           </Button>
-          <Button icon={<ExportOutlined />}>
+          <Button icon={<DownloadOutlined />} onClick={handleExport}>
             导出
           </Button>
-          <Button icon={<ImportOutlined />}>
-            导入
-          </Button>
-          <Popconfirm
-            title="确定要重置所有映射吗？"
-            onConfirm={handleReset}
-            okText="确定"
-            cancelText="取消"
+          <Upload
+            accept=".json"
+            showUploadList={false}
+            beforeUpload={handleImport}
           >
-            <Button icon={<ClearOutlined />}>
-              重置
+            <Button icon={<UploadOutlined />}>
+              导入
             </Button>
-          </Popconfirm>
-          <Popconfirm
-            title="确定要清空所有映射吗？此操作不可恢复！"
-            onConfirm={handleClearAll}
-            okText="确定"
-            cancelText="取消"
-          >
-            <Button danger icon={<DeleteOutlined />}>
-              清空
-            </Button>
-          </Popconfirm>
+          </Upload>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
             新建映射
           </Button>
@@ -357,120 +522,284 @@ const StubMappings = () => {
         title={selectedMapping ? '编辑映射' : '创建映射'}
         open={modalVisible}
         onCancel={() => setModalVisible(false)}
-        width={800}
+        width={1200}
         footer={null}
+        destroyOnClose
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSave}
         >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="映射名称"
-                name="name"
-              >
-                <Input placeholder="可选，用于标识映射" />
+          <Tabs defaultActiveKey="basic">
+            <TabPane tab="基本信息" key="basic">
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item label="映射名称" name="name">
+                    <Input placeholder="输入映射名称" />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="优先级" name="priority">
+                    <InputNumber min={1} max={10} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col span={6}>
+                  <Form.Item label="场景名称" name="scenarioName">
+                    <Input placeholder="场景名称" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item label="所需场景状态" name="requiredScenarioState">
+                    <Input placeholder="所需状态" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item label="新场景状态" name="newScenarioState">
+                    <Input placeholder="新状态" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              
+              <Form.Item label="备注" name="comment">
+                <TextArea rows={3} placeholder="输入映射的详细说明..." />
               </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="优先级"
-                name="priority"
-                initialValue={5}
-              >
-                <Input type="number" placeholder="数字越小优先级越高" />
-              </Form.Item>
-            </Col>
-          </Row>
+            </TabPane>
 
-          <Divider>请求匹配条件</Divider>
-          
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                label="HTTP 方法"
-                name={['request', 'method']}
-                rules={[{ required: true, message: '请选择HTTP方法' }]}
-              >
-                <Select>
-                  <Option value="GET">GET</Option>
-                  <Option value="POST">POST</Option>
-                  <Option value="PUT">PUT</Option>
-                  <Option value="DELETE">DELETE</Option>
-                  <Option value="PATCH">PATCH</Option>
-                  <Option value="HEAD">HEAD</Option>
-                  <Option value="OPTIONS">OPTIONS</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={16}>
-              <Form.Item
-                label="URL 路径"
-                name={['request', 'url']}
-                rules={[{ required: true, message: '请输入URL路径' }]}
-              >
-                <Input placeholder="/api/users" />
-              </Form.Item>
-            </Col>
-          </Row>
+            <TabPane tab="请求配置" key="request">
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item
+                    label="HTTP方法"
+                    name={['request', 'method']}
+                    rules={[{ required: true, message: '请选择HTTP方法' }]}
+                  >
+                    <Select>
+                      <Option value="GET">GET</Option>
+                      <Option value="POST">POST</Option>
+                      <Option value="PUT">PUT</Option>
+                      <Option value="DELETE">DELETE</Option>
+                      <Option value="PATCH">PATCH</Option>
+                      <Option value="HEAD">HEAD</Option>
+                      <Option value="OPTIONS">OPTIONS</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={16}>
+                  <Form.Item
+                    label="URL路径"
+                    name={['request', 'urlPath']}
+                    rules={[{ required: true, message: '请输入URL路径' }]}
+                  >
+                    <Input placeholder="/api/example" />
+                  </Form.Item>
+                </Col>
+              </Row>
 
-          <Divider>响应配置</Divider>
-          
-          <Row gutter={16}>
-            <Col span={8}>
-              <Form.Item
-                label="状态码"
-                name={['response', 'status']}
-                rules={[{ required: true, message: '请输入状态码' }]}
-              >
-                <Input type="number" placeholder="200" />
+              <Form.Item label="URL路径模式" name={['request', 'urlPathPattern']}>
+                <Input placeholder="/api/users/[0-9]+" />
               </Form.Item>
-            </Col>
-            <Col span={16}>
-              <Form.Item
-                label="Content-Type"
-                name={['response', 'headers', 'Content-Type']}
-              >
-                <Select>
-                  <Option value="application/json">application/json</Option>
-                  <Option value="text/html">text/html</Option>
-                  <Option value="text/plain">text/plain</Option>
-                  <Option value="application/xml">application/xml</Option>
-                </Select>
+
+              <Collapse>
+                <Panel header="查询参数" key="params">
+                  <Form.Item name={['request', 'queryParameters']}>
+                    <KeyValueEditor placeholder="查询参数" />
+                  </Form.Item>
+                </Panel>
+
+                <Panel header="请求头" key="headers">
+                  <Form.Item name={['request', 'headers']}>
+                    <KeyValueEditor placeholder="请求头" />
+                  </Form.Item>
+                </Panel>
+
+                <Panel header="Cookies" key="cookies">
+                  <Form.Item name={['request', 'cookies']}>
+                    <KeyValueEditor placeholder="Cookie" />
+                  </Form.Item>
+                </Panel>
+
+                <Panel header="身份验证" key="auth">
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item label="用户名" name={['request', 'basicAuth', 'username']}>
+                        <Input placeholder="用户名" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item label="密码" name={['request', 'basicAuth', 'password']}>
+                        <Input.Password placeholder="密码" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Panel>
+
+                <Panel header="请求体" key="body">
+                  <Form.Item name={['request', 'body']}>
+                    <Editor
+                      height="200px"
+                      language="json"
+                      options={{ minimap: { enabled: false } }}
+                    />
+                  </Form.Item>
+                </Panel>
+              </Collapse>
+            </TabPane>
+
+            <TabPane tab="响应配置" key="response">
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Form.Item
+                    label="状态码"
+                    name={['response', 'status']}
+                    rules={[{ required: true, message: '请输入状态码' }]}
+                  >
+                    <InputNumber min={100} max={599} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col span={16}>
+                  <Form.Item label="状态消息" name={['response', 'statusMessage']}>
+                    <Input placeholder="OK" />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Form.Item label="响应头" name={['response', 'headers']}>
+                <KeyValueEditor placeholder="响应头" />
               </Form.Item>
-            </Col>
-          </Row>
 
-          <Form.Item
-            label="响应体"
-            name={['response', 'body']}
-          >
-            <div className="json-editor">
-              <Editor
-                height="200px"
-                defaultLanguage="json"
-                theme="vs-light"
-                options={{
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                  fontSize: 14,
-                }}
-              />
-            </div>
-          </Form.Item>
+              <Form.Item label="响应体" name={['response', 'body']}>
+                <Editor
+                  height="200px"
+                  language="json"
+                  options={{ minimap: { enabled: false } }}
+                />
+              </Form.Item>
 
-          <Form.Item>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item label="固定延时(ms)" name={['response', 'fixedDelayMilliseconds']}>
+                    <InputNumber min={0} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item label="延时分布类型" name={['response', 'delayDistribution', 'type']}>
+                    <Select>
+                      <Option value="uniform">均匀分布</Option>
+                      <Option value="lognormal">对数正态分布</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item label="延时下限(ms)" name={['response', 'delayDistribution', 'lower']}>
+                    <InputNumber min={0} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item label="延时上限(ms)" name={['response', 'delayDistribution', 'upper']}>
+                    <InputNumber min={0} style={{ width: '100%' }} />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </TabPane>
+
+            <TabPane tab="Webhook配置" key="webhook">
+              <Form.List name="postServeActions">
+                {(fields, { add, remove }) => (
+                  <>
+                    {fields.map(({ key, name, ...restField }) => (
+                      <Card
+                        key={key}
+                        title={`Webhook ${name + 1}`}
+                        extra={
+                          <Button
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => remove(name)}
+                          />
+                        }
+                        style={{ marginBottom: 16 }}
+                      >
+                        <Form.Item
+                          {...restField}
+                          label="URL"
+                          name={[name, 'webhook', 'url']}
+                          initialValue="{{jsonPath request.body '$.data.callbackUrl'}}"
+                          rules={[{ required: true, message: '请输入Webhook URL' }]}
+                        >
+                          <Input placeholder="{{jsonPath request.body '$.data.callbackUrl'}}" />
+                        </Form.Item>
+
+                        <Form.Item
+                          {...restField}
+                          label="HTTP方法"
+                          name={[name, 'webhook', 'method']}
+                          initialValue="POST"
+                        >
+                          <Select>
+                            <Option value="GET">GET</Option>
+                            <Option value="POST">POST</Option>
+                            <Option value="PUT">PUT</Option>
+                            <Option value="DELETE">DELETE</Option>
+                          </Select>
+                        </Form.Item>
+
+                        <Form.Item
+                          {...restField}
+                          label="请求头"
+                          name={[name, 'webhook', 'headers']}
+                        >
+                          <KeyValueEditor placeholder="请求头" />
+                        </Form.Item>
+
+                        <Form.Item
+                          {...restField}
+                          label="请求体"
+                          name={[name, 'webhook', 'body']}
+                        >
+                          <TextArea rows={4} placeholder="请求体内容..." />
+                        </Form.Item>
+
+                        <Form.Item
+                          {...restField}
+                          label="延时(ms)"
+                          name={[name, 'webhook', 'fixedDelayMilliseconds']}
+                        >
+                          <InputNumber min={0} style={{ width: '100%' }} />
+                        </Form.Item>
+                      </Card>
+                    ))}
+                    <Button
+                      type="dashed"
+                      onClick={() => add()}
+                      block
+                      icon={<PlusOutlined />}
+                    >
+                      添加 Webhook
+                    </Button>
+                  </>
+                )}
+              </Form.List>
+            </TabPane>
+          </Tabs>
+
+          <div style={{ textAlign: 'right', marginTop: 16 }}>
             <Space>
-              <Button type="primary" htmlType="submit">
-                {selectedMapping ? '更新' : '创建'}
-              </Button>
               <Button onClick={() => setModalVisible(false)}>
                 取消
               </Button>
+              <Button type="primary" htmlType="submit">
+                {selectedMapping ? '更新' : '创建'}
+              </Button>
             </Space>
-          </Form.Item>
+          </div>
         </Form>
       </Modal>
 
@@ -478,48 +807,62 @@ const StubMappings = () => {
       <Drawer
         title="映射详情"
         placement="right"
-        width={600}
+        width={800}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
       >
         {selectedMapping && (
           <div>
-            <Title level={4}>基本信息</Title>
-            <p><strong>ID:</strong> {selectedMapping.id}</p>
-            <p><strong>名称:</strong> {selectedMapping.name || '未命名'}</p>
-            <p><strong>优先级:</strong> {selectedMapping.priority || 5}</p>
-            
+            <Descriptions title="基本信息" bordered column={2}>
+              <Descriptions.Item label="名称">
+                {selectedMapping.name || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="优先级">
+                {selectedMapping.priority || 5}
+              </Descriptions.Item>
+              <Descriptions.Item label="场景">
+                {selectedMapping.scenarioName || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="状态">
+                {selectedMapping.requiredScenarioState || '-'} → {selectedMapping.newScenarioState || '-'}
+              </Descriptions.Item>
+              <Descriptions.Item label="备注" span={2}>
+                {selectedMapping.comment || '-'}
+              </Descriptions.Item>
+            </Descriptions>
+
             <Divider />
-            
-            <Title level={4}>请求匹配</Title>
-            <div className="json-editor">
-              <Editor
-                height="200px"
-                defaultLanguage="json"
-                value={JSON.stringify(selectedMapping.request, null, 2)}
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                }}
-              />
-            </div>
-            
+
+            <Title level={4}>请求配置</Title>
+            <Editor
+              height="200px"
+              language="json"
+              value={JSON.stringify(selectedMapping.request, null, 2)}
+              options={{ readOnly: true, minimap: { enabled: false } }}
+            />
+
             <Divider />
-            
+
             <Title level={4}>响应配置</Title>
-            <div className="json-editor">
-              <Editor
-                height="200px"
-                defaultLanguage="json"
-                value={JSON.stringify(selectedMapping.response, null, 2)}
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: false },
-                  scrollBeyondLastLine: false,
-                }}
-              />
-            </div>
+            <Editor
+              height="200px"
+              language="json"
+              value={JSON.stringify(selectedMapping.response, null, 2)}
+              options={{ readOnly: true, minimap: { enabled: false } }}
+            />
+
+            {selectedMapping.postServeActions && selectedMapping.postServeActions.length > 0 && (
+              <>
+                <Divider />
+                <Title level={4}>Webhook配置</Title>
+                <Editor
+                  height="200px"
+                  language="json"
+                  value={JSON.stringify(selectedMapping.postServeActions, null, 2)}
+                  options={{ readOnly: true, minimap: { enabled: false } }}
+                />
+              </>
+            )}
           </div>
         )}
       </Drawer>
