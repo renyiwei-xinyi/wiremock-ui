@@ -37,29 +37,91 @@ export const handleExport = (mappings, selectedRowKeys) => {
 
 // 导入映射
 export const handleImport = (file, fetchMappings) => {
+  // 验证文件类型
+  if (!file.type.includes('json') && !file.name.endsWith('.json')) {
+    notification.error({
+      message: '文件类型错误',
+      description: '请选择 JSON 格式的文件',
+    });
+    return false;
+  }
+
+  // 验证文件大小 (限制为 10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    notification.error({
+      message: '文件过大',
+      description: '文件大小不能超过 10MB',
+    });
+    return false;
+  }
+
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
       const importData = JSON.parse(e.target.result);
-      const importMappings = importData.mappings || [importData];
+      
+      // 验证数据结构
+      if (!importData || (typeof importData !== 'object')) {
+        throw new Error('无效的文件格式');
+      }
+
+      const importMappings = importData.mappings || (Array.isArray(importData) ? importData : [importData]);
+      
+      if (!Array.isArray(importMappings) || importMappings.length === 0) {
+        throw new Error('文件中没有找到有效的映射数据');
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
       
       for (const mapping of importMappings) {
-        delete mapping.id;
-        await stubMappingsApi.create(mapping);
+        try {
+          // 清理映射数据
+          const cleanMapping = { ...mapping };
+          delete cleanMapping.id;
+          delete cleanMapping.uuid;
+          
+          // 验证必要字段
+          if (!cleanMapping.request || !cleanMapping.response) {
+            throw new Error('映射缺少必要的 request 或 response 字段');
+          }
+
+          await stubMappingsApi.create(cleanMapping);
+          successCount++;
+        } catch (mappingError) {
+          console.error('导入单个映射失败:', mappingError);
+          errorCount++;
+        }
       }
       
-      notification.success({
-        message: '导入成功',
-        description: `成功导入 ${importMappings.length} 个映射`,
-      });
-      fetchMappings();
+      if (successCount > 0) {
+        notification.success({
+          message: '导入完成',
+          description: `成功导入 ${successCount} 个映射${errorCount > 0 ? `，失败 ${errorCount} 个` : ''}`,
+        });
+        fetchMappings();
+      } else {
+        notification.error({
+          message: '导入失败',
+          description: '所有映射都导入失败，请检查文件格式',
+        });
+      }
     } catch (error) {
+      console.error('导入文件解析失败:', error);
       notification.error({
         message: '导入失败',
-        description: '文件格式错误或导入过程中出现问题',
+        description: error.message || '文件格式错误或导入过程中出现问题',
       });
     }
   };
+
+  reader.onerror = () => {
+    notification.error({
+      message: '文件读取失败',
+      description: '无法读取选择的文件',
+    });
+  };
+
   reader.readAsText(file);
   return false;
 };

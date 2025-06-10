@@ -41,8 +41,12 @@ export const createColumns = (handleView) => [
     dataIndex: 'loggedDate',
     key: 'loggedDate',
     width: 180,
-    render: (date) => dayjs(date).format('YYYY-MM-DD HH:mm:ss'),
-    sorter: (a, b) => new Date(a.loggedDate) - new Date(b.loggedDate),
+    render: (date) => date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-',
+    sorter: (a, b) => {
+      const dateA = a.loggedDate ? new Date(a.loggedDate) : new Date(0);
+      const dateB = b.loggedDate ? new Date(b.loggedDate) : new Date(0);
+      return dateA - dateB;
+    },
     defaultSortOrder: 'descend',
   },
   {

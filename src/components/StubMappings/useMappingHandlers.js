@@ -28,7 +28,15 @@ export const useMappingHandlers = (form, fetchMappings) => {
   // 复制映射
   const handleCopy = (record) => {
     const formData = mapRecordToFormData(record);
-    formData.name = `${record.name || 'Copy'} - 副本`;
+    // 生成更智能的复制名称
+    const originalName = record.name || `${record.request?.method || 'GET'} ${record.request?.urlPath || '/'}`;
+    const timestamp = new Date().toLocaleString('zh-CN', { 
+      month: '2-digit', 
+      day: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    formData.name = `${originalName} - 副本 (${timestamp})`;
     setSelectedMapping(null);
     form.setFieldsValue(formData);
     setModalVisible(true);

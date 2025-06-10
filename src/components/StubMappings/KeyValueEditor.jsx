@@ -18,8 +18,9 @@ const KeyValueEditor = ({ value = {}, onChange, placeholder }) => {
     setPairs(newPairs);
     const obj = {};
     newPairs.forEach(pair => {
-      if (pair.key && pair.value) {
-        obj[pair.key] = pair.value;
+      if (pair.key && pair.key.trim()) {
+        // 支持空值，但键不能为空
+        obj[pair.key.trim()] = pair.value || '';
       }
     });
     onChange?.(obj);

@@ -55,7 +55,11 @@ export const createColumns = (handlers) => {
       key: 'url',
       render: (request) => {
         const url = request?.urlPath || request?.urlPathPattern || request?.urlPattern || request?.url || request?.urlEqualTo || '-';
-        return <Text code>{url}</Text>;
+        return (
+          <Text code style={{ wordBreak: 'break-all' }}>
+            {url.length > 50 ? `${url.substring(0, 47)}...` : url}
+          </Text>
+        );
       },
     },
     {

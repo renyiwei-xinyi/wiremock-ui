@@ -13,9 +13,10 @@ export const useMappingOperations = (fetchMappings) => {
       });
       fetchMappings();
     } catch (error) {
+      console.error('删除映射失败:', error);
       notification.error({
         message: '删除失败',
-        description: error.message,
+        description: error.response?.data?.message || error.message || '删除操作失败',
       });
     }
   };
@@ -73,9 +74,10 @@ export const useMappingOperations = (fetchMappings) => {
       fetchMappings();
       return true; // 表示操作成功
     } catch (error) {
+      console.error('保存映射失败:', error);
       notification.error({
         message: selectedMapping ? '更新失败' : '创建失败',
-        description: error.message,
+        description: error.response?.data?.message || error.message || '保存操作失败，请检查配置是否正确',
       });
       return false; // 表示操作失败
     }

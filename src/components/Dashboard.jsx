@@ -31,9 +31,12 @@ const Dashboard = ({ systemInfo, connectionStatus }) => {
       ]);
 
       const newStats = {
-        totalMappings: mappingsRes.status === 'fulfilled' ? mappingsRes.value.data.mappings?.length || 0 : 0,
-        totalRequests: requestsRes.status === 'fulfilled' ? requestsRes.value.data.count || 0 : 0,
-        unmatchedRequests: unmatchedRes.status === 'fulfilled' ? unmatchedRes.value.data.requests?.length || 0 : 0,
+        totalMappings: mappingsRes.status === 'fulfilled' ? 
+          (mappingsRes.value.data.mappings?.length || mappingsRes.value.data?.length || 0) : 0,
+        totalRequests: requestsRes.status === 'fulfilled' ? 
+          (requestsRes.value.data.count || requestsRes.value.data?.length || 0) : 0,
+        unmatchedRequests: unmatchedRes.status === 'fulfilled' ? 
+          (unmatchedRes.value.data.requests?.length || unmatchedRes.value.data?.length || 0) : 0,
         loading: false,
       };
 
@@ -190,7 +193,7 @@ const Dashboard = ({ systemInfo, connectionStatus }) => {
                 icon={<ApiOutlined />} 
                 size="large" 
                 block
-                href="#/stub-mappings"
+                onClick={() => window.location.hash = '#/stub-mappings'}
               >
                 管理 Stub 映射
               </Button>
@@ -200,7 +203,7 @@ const Dashboard = ({ systemInfo, connectionStatus }) => {
                 icon={<HistoryOutlined />} 
                 size="large" 
                 block
-                href="#/requests"
+                onClick={() => window.location.hash = '#/requests'}
               >
                 查看请求记录
               </Button>
@@ -210,7 +213,7 @@ const Dashboard = ({ systemInfo, connectionStatus }) => {
                 icon={<PlayCircleOutlined />} 
                 size="large" 
                 block
-                href="#/recording"
+                onClick={() => window.location.hash = '#/recording'}
               >
                 录制回放
               </Button>

@@ -39,12 +39,16 @@ const Requests = () => {
     setLoading(true);
     try {
       const response = await requestsApi.getAll();
-      setRequests(response.data.requests || []);
+      // 处理不同的响应数据结构
+      const requestsData = response.data.requests || response.data || [];
+      setRequests(Array.isArray(requestsData) ? requestsData : []);
     } catch (error) {
+      console.error('获取请求记录失败:', error);
       notification.error({
         message: '获取请求记录失败',
-        description: error.message,
+        description: error.response?.data?.message || error.message || '网络连接错误',
       });
+      setRequests([]); // 确保在错误时设置为空数组
     } finally {
       setLoading(false);
     }
@@ -153,7 +157,7 @@ const Requests = () => {
         <Table
           columns={columns}
           dataSource={filteredRequests}
-          rowKey="id"
+          rowKey={(record) => record.id || record.uuid || `${record.loggedDate}-${Math.random()}`}
           loading={loading}
           pagination={{
             total: filteredRequests.length,

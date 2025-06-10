@@ -10,6 +10,7 @@ import {
   Card,
   Drawer,
   Upload,
+  notification,
 } from 'antd';
 import {
   PlusOutlined,
@@ -40,9 +41,16 @@ const StubMappings = () => {
     setLoading(true);
     try {
       const response = await stubMappingsApi.getAll();
-      setMappings(response.data.mappings || []);
+      // 处理不同的响应数据结构
+      const mappingsData = response.data.mappings || response.data || [];
+      setMappings(Array.isArray(mappingsData) ? mappingsData : []);
     } catch (error) {
       console.error('获取映射失败:', error);
+      notification.error({
+        message: '获取映射失败',
+        description: error.response?.data?.message || error.message || '网络连接错误',
+      });
+      setMappings([]); // 确保在错误时设置为空数组
     } finally {
       setLoading(false);
     }
@@ -140,7 +148,7 @@ const StubMappings = () => {
         <Table
           columns={columns}
           dataSource={filteredMappings}
-          rowKey="id"
+          rowKey={(record) => record.id || record.uuid || `mapping-${Math.random()}`}
           loading={loading}
           rowSelection={{
             selectedRowKeys,
