@@ -210,7 +210,15 @@ const StubMappings = () => {
         fixedDelayMilliseconds: record.response?.fixedDelayMilliseconds || 0,
         delayDistribution: record.response?.delayDistribution || { type: 'uniform', lower: 0, upper: 0 }
       },
-      postServeActions: record.postServeActions || []
+      postServeActions: (record.postServeActions || []).map(action => ({
+        webhook: {
+          url: action.webhook?.url || '',
+          method: action.webhook?.method || 'POST',
+          headers: action.webhook?.headers || {},
+          body: action.webhook?.body || '',
+          fixedDelayMilliseconds: action.webhook?.fixedDelayMilliseconds || 0
+        }
+      }))
     };
     
     form.setFieldsValue(formData);
@@ -891,14 +899,21 @@ const StubMappings = () => {
               language="json"
               value={JSON.stringify({
                 ...selectedMapping.response,
-                // 格式化body字段，去除转义
+                // 格式化body字段，处理转义字符
                 body: selectedMapping.response?.body ? 
                   (typeof selectedMapping.response.body === 'string' ? 
                     (() => {
                       try {
+                        // 先尝试解析JSON
                         return JSON.parse(selectedMapping.response.body);
                       } catch {
-                        return selectedMapping.response.body;
+                        // 如果不是JSON，处理转义字符
+                        return selectedMapping.response.body
+                          .replace(/\\n/g, '\n')
+                          .replace(/\\t/g, '\t')
+                          .replace(/\\r/g, '\r')
+                          .replace(/\\"/g, '"')
+                          .replace(/\\\\/g, '\\');
                       }
                     })() : selectedMapping.response.body
                   ) : undefined
