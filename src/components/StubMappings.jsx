@@ -182,30 +182,58 @@ const StubMappings = () => {
   // 编辑映射
   const handleEdit = (record) => {
     setSelectedMapping(record);
-    form.setFieldsValue({
-      ...record,
+    
+    // 确定URL匹配模式
+    let urlMatchType = 'urlPath';
+    let urlValue = '/';
+    
+    if (record.request?.urlPath) {
+      urlMatchType = 'urlPath';
+      urlValue = record.request.urlPath;
+    } else if (record.request?.urlPathPattern) {
+      urlMatchType = 'urlPathPattern';
+      urlValue = record.request.urlPathPattern;
+    } else if (record.request?.url) {
+      urlMatchType = 'url';
+      urlValue = record.request.url;
+    } else if (record.request?.urlPattern) {
+      urlMatchType = 'urlPattern';
+      urlValue = record.request.urlPattern;
+    } else if (record.request?.urlEqualTo) {
+      urlMatchType = 'urlEqualTo';
+      urlValue = record.request.urlEqualTo;
+    }
+    
+    // 正确回写所有配置数据到表单
+    const formData = {
+      name: record.name || '',
+      priority: record.priority || 5,
+      scenarioName: record.scenarioName || '',
+      requiredScenarioState: record.requiredScenarioState || '',
+      newScenarioState: record.newScenarioState || '',
+      comment: record.comment || '',
+      urlMatchType: urlMatchType,
       request: {
-        method: 'GET',
-        urlPath: '/',
-        urlPathPattern: '',
-        queryParameters: {},
-        headers: { 'Content-Type': 'application/json' },
-        cookies: {},
-        basicAuth: { username: '', password: '' },
-        body: '',
-        ...record.request
+        method: record.request?.method || 'GET',
+        urlPath: urlValue,
+        queryParameters: record.request?.queryParameters || {},
+        headers: record.request?.headers || {},
+        cookies: record.request?.cookies || {},
+        basicAuth: record.request?.basicAuth || { username: '', password: '' },
+        body: record.request?.body || ''
       },
       response: {
-        status: 200,
-        statusMessage: '',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-        fixedDelayMilliseconds: 0,
-        delayDistribution: { type: 'uniform', lower: 0, upper: 0 },
-        ...record.response
+        status: record.response?.status || 200,
+        statusMessage: record.response?.statusMessage || '',
+        headers: record.response?.headers || {},
+        body: record.response?.body || '{}',
+        fixedDelayMilliseconds: record.response?.fixedDelayMilliseconds || 0,
+        delayDistribution: record.response?.delayDistribution || { type: 'uniform', lower: 0, upper: 0 }
       },
       postServeActions: record.postServeActions || []
-    });
+    };
+    
+    form.setFieldsValue(formData);
     setModalVisible(true);
   };
 
@@ -247,20 +275,44 @@ const StubMappings = () => {
   // 保存映射
   const handleSave = async (values) => {
     try {
+      // 根据URL匹配模式构建请求对象
+      const request = {
+        method: values.request.method,
+        queryParameters: Object.keys(values.request.queryParameters || {}).length > 0 
+          ? values.request.queryParameters : undefined,
+        headers: Object.keys(values.request.headers || {}).length > 0 
+          ? values.request.headers : undefined,
+        cookies: Object.keys(values.request.cookies || {}).length > 0 
+          ? values.request.cookies : undefined,
+        basicAuth: (values.request.basicAuth?.username || values.request.basicAuth?.password) 
+          ? values.request.basicAuth : undefined,
+        body: values.request.body || undefined
+      };
+
+      // 根据选择的URL匹配模式设置相应的URL字段
+      const urlValue = values.request.urlPath;
+      if (values.urlMatchType === 'any') {
+        // Any URL 不需要设置URL字段
+      } else if (values.urlMatchType === 'urlPath') {
+        request.urlPath = urlValue;
+      } else if (values.urlMatchType === 'urlPathPattern') {
+        request.urlPathPattern = urlValue;
+      } else if (values.urlMatchType === 'url') {
+        request.url = urlValue;
+      } else if (values.urlMatchType === 'urlPattern') {
+        request.urlPattern = urlValue;
+      } else if (values.urlMatchType === 'urlEqualTo') {
+        request.urlEqualTo = urlValue;
+      }
+
       const cleanedValues = {
-        ...values,
-        request: {
-          ...values.request,
-          queryParameters: Object.keys(values.request.queryParameters || {}).length > 0 
-            ? values.request.queryParameters : undefined,
-          headers: Object.keys(values.request.headers || {}).length > 0 
-            ? values.request.headers : undefined,
-          cookies: Object.keys(values.request.cookies || {}).length > 0 
-            ? values.request.cookies : undefined,
-          basicAuth: (values.request.basicAuth?.username || values.request.basicAuth?.password) 
-            ? values.request.basicAuth : undefined,
-          body: values.request.body || undefined
-        },
+        name: values.name || undefined,
+        priority: values.priority || undefined,
+        scenarioName: values.scenarioName || undefined,
+        requiredScenarioState: values.requiredScenarioState || undefined,
+        newScenarioState: values.newScenarioState || undefined,
+        comment: values.comment || undefined,
+        request: request,
         response: {
           ...values.response,
           headers: Object.keys(values.response.headers || {}).length > 0 
@@ -270,11 +322,7 @@ const StubMappings = () => {
           delayDistribution: (values.response.delayDistribution?.lower > 0 || values.response.delayDistribution?.upper > 0)
             ? values.response.delayDistribution : undefined
         },
-        postServeActions: values.postServeActions?.length > 0 ? values.postServeActions : undefined,
-        scenarioName: values.scenarioName || undefined,
-        requiredScenarioState: values.requiredScenarioState || undefined,
-        newScenarioState: values.newScenarioState || undefined,
-        comment: values.comment || undefined
+        postServeActions: values.postServeActions?.length > 0 ? values.postServeActions : undefined
       };
 
       if (selectedMapping) {
@@ -405,9 +453,12 @@ const StubMappings = () => {
     },
     {
       title: 'URL',
-      dataIndex: ['request', 'urlPath'],
+      dataIndex: ['request'],
       key: 'url',
-      render: (url) => <Text code>{url}</Text>,
+      render: (request) => {
+        const url = request?.urlPath || request?.urlPathPattern || request?.urlPattern || request?.url || request?.urlEqualTo || '-';
+        return <Text code>{url}</Text>;
+      },
     },
     {
       title: '状态码',
@@ -588,20 +639,32 @@ const StubMappings = () => {
                     </Select>
                   </Form.Item>
                 </Col>
-                <Col span={16}>
+                <Col span={8}>
                   <Form.Item
-                    label="URL路径"
+                    label="URL匹配模式"
+                    name="urlMatchType"
+                    initialValue="urlPath"
+                  >
+                    <Select>
+                      <Option value="urlPath">Path and Query</Option>
+                      <Option value="urlPathPattern">Path and Query Regex</Option>
+                      <Option value="url">Path</Option>
+                      <Option value="urlPattern">Path Regex</Option>
+                      <Option value="urlEqualTo">Exact URL</Option>
+                      <Option value="any">Any URL</Option>
+                    </Select>
+                  </Form.Item>
+                </Col>
+                <Col span={8}>
+                  <Form.Item
+                    label="URL值"
                     name={['request', 'urlPath']}
-                    rules={[{ required: true, message: '请输入URL路径' }]}
+                    rules={[{ required: true, message: '请输入URL值' }]}
                   >
                     <Input placeholder="/api/example" />
                   </Form.Item>
                 </Col>
               </Row>
-
-              <Form.Item label="URL路径模式" name={['request', 'urlPathPattern']}>
-                <Input placeholder="/api/users/[0-9]+" />
-              </Form.Item>
 
               <Collapse>
                 <Panel header="查询参数" key="params">
