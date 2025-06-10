@@ -75,12 +75,36 @@ const StubMappings = () => {
     handleSave,
   } = useMappingHandlers(form, fetchMappings);
 
+  // 切换映射启用状态
+  const handleToggleStatus = async (record, enabled) => {
+    try {
+      const updatedMapping = {
+        ...record,
+        persistent: enabled
+      };
+      
+      await stubMappingsApi.update(record.id, updatedMapping);
+      notification.success({
+        message: enabled ? '映射已启用' : '映射已禁用',
+        description: `映射 "${record.name || record.request?.method + ' ' + (record.request?.urlPath || record.request?.urlPathPattern)}" 状态已更新`,
+      });
+      fetchMappings();
+    } catch (error) {
+      console.error('切换映射状态失败:', error);
+      notification.error({
+        message: '状态切换失败',
+        description: error.response?.data?.message || error.message || '操作失败',
+      });
+    }
+  };
+
   // 创建表格列配置
   const columns = createColumns({
     handleView,
     handleEdit,
     handleCopy,
     handleDelete,
+    handleToggleStatus,
   });
 
   // 过滤映射数据
@@ -142,6 +166,7 @@ const StubMappings = () => {
             映射配置是 WireMock 的核心功能，用于定义如何匹配传入的 HTTP 请求并返回相应的响应。
             每个映射包含请求匹配条件（URL、方法、头部等）和响应配置（状态码、响应体、延时等）。
             您可以创建多个映射来模拟不同的 API 端点，支持正则表达式匹配、场景状态管理和 Webhook 回调。
+            使用状态开关可以快速启用或禁用特定的映射规则。
           </Text>
         </div>
         

@@ -7,40 +7,69 @@ import {
   ExclamationCircleOutlined,
   ReloadOutlined,
   PlayCircleOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
-import { stubMappingsApi, requestsApi } from '../services/wiremockApi';
+import { useNavigate } from 'react-router-dom';
+import { stubMappingsApi, requestsApi, systemApi } from '../services/wiremockApi';
 
 const { Title, Paragraph } = Typography;
 
-const Dashboard = ({ systemInfo, connectionStatus }) => {
+const Dashboard = ({ connectionStatus }) => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalMappings: 0,
     totalRequests: 0,
     unmatchedRequests: 0,
     loading: true,
   });
+  const [systemInfo, setSystemInfo] = useState(null);
 
   const fetchStats = async () => {
     try {
       setStats(prev => ({ ...prev, loading: true }));
       
-      const [mappingsRes, requestsRes, unmatchedRes] = await Promise.allSettled([
+      const [mappingsRes, requestsRes, unmatchedRes, systemRes] = await Promise.allSettled([
         stubMappingsApi.getAll(),
-        requestsApi.getCount(),
+        requestsApi.getAll(),
         requestsApi.getUnmatched(),
+        systemApi.getInfo(),
       ]);
 
-      const newStats = {
-        totalMappings: mappingsRes.status === 'fulfilled' ? 
-          (mappingsRes.value.data.mappings?.length || mappingsRes.value.data?.length || 0) : 0,
-        totalRequests: requestsRes.status === 'fulfilled' ? 
-          (requestsRes.value.data.count || requestsRes.value.data?.length || 0) : 0,
-        unmatchedRequests: unmatchedRes.status === 'fulfilled' ? 
-          (unmatchedRes.value.data.requests?.length || unmatchedRes.value.data?.length || 0) : 0,
-        loading: false,
-      };
+      // 处理映射数据
+      let totalMappings = 0;
+      if (mappingsRes.status === 'fulfilled') {
+        const mappingsData = mappingsRes.value.data;
+        totalMappings = mappingsData.mappings?.length || 
+                      (Array.isArray(mappingsData) ? mappingsData.length : 0);
+      }
 
-      setStats(newStats);
+      // 处理请求数据
+      let totalRequests = 0;
+      if (requestsRes.status === 'fulfilled') {
+        const requestsData = requestsRes.value.data;
+        totalRequests = requestsData.requests?.length || 
+                       (Array.isArray(requestsData) ? requestsData.length : 0);
+      }
+
+      // 处理未匹配请求数据
+      let unmatchedRequests = 0;
+      if (unmatchedRes.status === 'fulfilled') {
+        const unmatchedData = unmatchedRes.value.data;
+        unmatchedRequests = unmatchedData.requests?.length || 
+                           (Array.isArray(unmatchedData) ? unmatchedData.length : 0);
+      }
+
+      // 处理系统信息
+      if (systemRes.status === 'fulfilled') {
+        setSystemInfo(systemRes.value.data);
+      }
+
+      setStats({
+        totalMappings,
+        totalRequests,
+        unmatchedRequests,
+        loading: false,
+      });
     } catch (error) {
       console.error('获取统计数据失败:', error);
       setStats(prev => ({ ...prev, loading: false }));
@@ -157,33 +186,31 @@ const Dashboard = ({ systemInfo, connectionStatus }) => {
           </Col>
         </Row>
 
-        {systemInfo && (
-          <Card title="系统信息" className="content-card">
-            <Row gutter={[16, 16]}>
-              <Col xs={24} md={12}>
-                <div>
-                  <strong>版本:</strong> {systemInfo.version || 'Unknown'}
-                </div>
-                <Divider />
-                <div>
-                  <strong>状态:</strong> 
-                  <span className={connectionStatus === 'connected' ? 'status-active' : 'status-inactive'}>
-                    {connectionStatus === 'connected' ? '运行中' : '未连接'}
-                  </span>
-                </div>
-              </Col>
-              <Col xs={24} md={12}>
-                <div>
-                  <strong>管理端口:</strong> 8080 (默认)
-                </div>
-                <Divider />
-                <div>
-                  <strong>服务端口:</strong> 8080 (默认)
-                </div>
-              </Col>
-            </Row>
-          </Card>
-        )}
+        <Card title="系统信息" className="content-card">
+          <Row gutter={[16, 16]}>
+            <Col xs={24} md={12}>
+              <div>
+                <strong>版本:</strong> {systemInfo?.version || 'WireMock 2.x'}
+              </div>
+              <Divider />
+              <div>
+                <strong>状态:</strong> 
+                <span className={connectionStatus === 'connected' ? 'status-active' : 'status-inactive'}>
+                  {connectionStatus === 'connected' ? '运行中' : '未连接'}
+                </span>
+              </div>
+            </Col>
+            <Col xs={24} md={12}>
+              <div>
+                <strong>管理端口:</strong> {systemInfo?.port || '8080'}
+              </div>
+              <Divider />
+              <div>
+                <strong>服务端口:</strong> {systemInfo?.port || '8080'}
+              </div>
+            </Col>
+          </Row>
+        </Card>
 
         <Card title="快速操作" className="content-card">
           <Row gutter={[16, 16]}>
@@ -193,7 +220,7 @@ const Dashboard = ({ systemInfo, connectionStatus }) => {
                 icon={<ApiOutlined />} 
                 size="large" 
                 block
-                onClick={() => window.location.hash = '#/stub-mappings'}
+                onClick={() => navigate('/stub-mappings')}
               >
                 管理 Stub 映射
               </Button>
@@ -203,7 +230,7 @@ const Dashboard = ({ systemInfo, connectionStatus }) => {
                 icon={<HistoryOutlined />} 
                 size="large" 
                 block
-                onClick={() => window.location.hash = '#/requests'}
+                onClick={() => navigate('/requests')}
               >
                 查看请求记录
               </Button>
@@ -213,9 +240,21 @@ const Dashboard = ({ systemInfo, connectionStatus }) => {
                 icon={<PlayCircleOutlined />} 
                 size="large" 
                 block
-                onClick={() => window.location.hash = '#/recording'}
+                onClick={() => navigate('/recording')}
               >
                 录制回放
+              </Button>
+            </Col>
+          </Row>
+          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+            <Col xs={24} sm={8}>
+              <Button 
+                icon={<SettingOutlined />} 
+                size="large" 
+                block
+                onClick={() => navigate('/settings')}
+              >
+                系统设置
               </Button>
             </Col>
           </Row>

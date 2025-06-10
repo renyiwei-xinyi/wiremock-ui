@@ -34,18 +34,59 @@ const getStatusTag = (status) => {
   return <Tag color={color}>{status}</Tag>;
 };
 
+// 获取时间字段值
+const getTimeValue = (record) => {
+  // 尝试多种可能的时间字段名
+  return record.loggedDate || 
+         record.timestamp || 
+         record.receivedAt || 
+         record.time || 
+         record.date ||
+         record.loggedDateString ||
+         null;
+};
+
 // 创建表格列配置
 export const createColumns = (handleView) => [
   {
     title: '时间',
-    dataIndex: 'loggedDate',
-    key: 'loggedDate',
+    key: 'time',
     width: 180,
-    render: (date) => date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-',
+    render: (_, record) => {
+      const timeValue = getTimeValue(record);
+      if (!timeValue) return '-';
+      
+      // 处理不同的时间格式
+      try {
+        // 如果是时间戳（毫秒）
+        if (typeof timeValue === 'number') {
+          return dayjs(timeValue).format('YYYY-MM-DD HH:mm:ss');
+        }
+        // 如果是字符串格式的时间
+        if (typeof timeValue === 'string') {
+          return dayjs(timeValue).format('YYYY-MM-DD HH:mm:ss');
+        }
+        return '-';
+      } catch (error) {
+        console.warn('时间格式解析失败:', timeValue, error);
+        return timeValue.toString();
+      }
+    },
     sorter: (a, b) => {
-      const dateA = a.loggedDate ? new Date(a.loggedDate) : new Date(0);
-      const dateB = b.loggedDate ? new Date(b.loggedDate) : new Date(0);
-      return dateA - dateB;
+      const timeA = getTimeValue(a);
+      const timeB = getTimeValue(b);
+      
+      if (!timeA && !timeB) return 0;
+      if (!timeA) return 1;
+      if (!timeB) return -1;
+      
+      try {
+        const dateA = new Date(timeA);
+        const dateB = new Date(timeB);
+        return dateB - dateA; // 降序排列，最新的在前
+      } catch (error) {
+        return 0;
+      }
     },
     defaultSortOrder: 'descend',
   },
@@ -58,16 +99,27 @@ export const createColumns = (handleView) => [
   },
   {
     title: 'URL',
-    dataIndex: ['request', 'url'],
     key: 'url',
-    render: (url) => <Text code>{url}</Text>,
+    render: (_, record) => {
+      const url = record.request?.url || 
+                  record.request?.absoluteUrl || 
+                  record.request?.path || 
+                  record.url || 
+                  '-';
+      return <Text code>{url}</Text>;
+    },
   },
   {
     title: '状态码',
-    dataIndex: ['response', 'status'],
     key: 'status',
     width: 80,
-    render: (status) => getStatusTag(status),
+    render: (_, record) => {
+      const status = record.response?.status || 
+                    record.responseDefinition?.status || 
+                    record.status || 
+                    0;
+      return getStatusTag(status);
+    },
   },
   {
     title: '匹配状态',

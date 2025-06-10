@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Space, Tag, Typography, Popconfirm } from 'antd';
+import { Button, Space, Tag, Typography, Popconfirm, Switch } from 'antd';
 import {
   EyeOutlined,
   EditOutlined,
@@ -24,16 +24,34 @@ const getMethodTag = (method) => {
 
 // 创建表格列配置
 export const createColumns = (handlers) => {
-  const { handleView, handleEdit, handleCopy, handleDelete } = handlers;
+  const { handleView, handleEdit, handleCopy, handleDelete, handleToggleStatus } = handlers;
 
   return [
+    {
+      title: '状态',
+      key: 'enabled',
+      width: 80,
+      render: (_, record) => (
+        <Switch
+          checked={record.persistent !== false}
+          onChange={(checked) => handleToggleStatus(record, checked)}
+          size="small"
+          title={record.persistent !== false ? '已启用' : '已禁用'}
+        />
+      ),
+    },
     {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
       render: (text, record) => (
         <div>
-          <div>{text || `${record.request?.method} ${record.request?.urlPath}`}</div>
+          <div style={{ 
+            opacity: record.persistent !== false ? 1 : 0.6,
+            textDecoration: record.persistent === false ? 'line-through' : 'none'
+          }}>
+            {text || `${record.request?.method} ${record.request?.urlPath || record.request?.urlPathPattern}`}
+          </div>
           {record.comment && (
             <Text type="secondary" style={{ fontSize: '12px' }}>
               {record.comment}
