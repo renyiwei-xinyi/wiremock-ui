@@ -4,41 +4,51 @@
 
 用户反馈：【Stub 映射管理】【编辑映射】【Webhook配置】存量配置无法正确展示已配置数据
 
-## 问题分析
+## 实际数据结构分析
 
-通过代码分析发现问题出现在两个地方：
+通过用户提供的真实数据，发现WireMock的`postServeActions`使用的是以下结构：
 
-### 1. 数据映射逻辑问题
-在 `src/components/StubMappings/hooks/useFormInitialization.js` 中，`mapRecordToFormData` 函数对 `postServeActions` 的处理过于简单，没有考虑到WireMock可能返回的不同数据结构。
+```json
+"postServeActions": [
+  {
+    "name": "webhook",
+    "parameters": {
+      "method": "POST",
+      "url": "http://sea.t.hopegoo.com/sea_order_center/shelvesPay/callback",
+      "headers": {
+        "Content-Type": "text/plain"
+      },
+      "body": "..."
+    }
+  }
+]
+```
 
-### 2. 表单组件默认值问题
-在 `src/components/StubMappings/MappingForm/WebhookConfigTab.jsx` 中，表单字段缺少合适的默认值和初始化处理。
+这与之前假设的数据结构完全不同，需要重新设计数据映射逻辑。
 
 ## 修复方案
 
-### 修复1: 增强数据映射逻辑
+### 修复1: 重新设计数据读取映射逻辑
 
 **文件：** `src/components/StubMappings/hooks/useFormInitialization.js`
 
-**修复前：**
-```javascript
-postServeActions: (record.postServeActions || []).map(action => ({
-  webhook: {
-    url: action.webhook?.url || '',
-    method: action.webhook?.method || 'POST',
-    headers: action.webhook?.headers || {},
-    body: action.webhook?.body || '',
-    fixedDelayMilliseconds: action.webhook?.fixedDelayMilliseconds || 0
-  }
-}))
-```
-
-**修复后：**
+**核心修复：**
 ```javascript
 postServeActions: (record.postServeActions || []).map(action => {
-  // 处理不同的postServeActions数据结构
-  if (action.webhook) {
-    // 标准的webhook结构
+  // 处理WireMock实际的postServeActions数据结构
+  if (action.name === 'webhook' && action.parameters) {
+    // WireMock标准的webhook结构: { name: "webhook", parameters: {...} }
+    return {
+      webhook: {
+        url: action.parameters.url || '',
+        method: action.parameters.method || 'POST',
+        headers: action.parameters.headers || {},
+        body: action.parameters.body || '',
+        fixedDelayMilliseconds: action.parameters.fixedDelayMilliseconds || 0
+      }
+    };
+  } else if (action.webhook) {
+    // 嵌套的webhook结构: { webhook: {...} }
     return {
       webhook: {
         url: action.webhook.url || '',
@@ -49,7 +59,7 @@ postServeActions: (record.postServeActions || []).map(action => {
       }
     };
   } else if (action.type === 'webhook' || action.webhookUrl) {
-    // 其他可能的webhook数据结构
+    // 扁平化结构
     return {
       webhook: {
         url: action.webhookUrl || action.url || '',
@@ -74,141 +84,180 @@ postServeActions: (record.postServeActions || []).map(action => {
 })
 ```
 
-### 修复2: 优化Webhook配置组件
+**额外改进：**
+- 支持从`metadata.wmui.description`读取注释信息
+- 支持`urlPattern`字段映射到`urlPathPattern`
+
+### 修复2: 重新设计数据保存映射逻辑
+
+**文件：** `src/components/StubMappings/hooks/useMappingOperations.js`
+
+**核心修复：**
+```javascript
+postServeActions: values.postServeActions?.length > 0 ? 
+  values.postServeActions.map(action => {
+    // 将表单数据转换回WireMock期望的格式
+    if (action.webhook) {
+      return {
+        name: 'webhook',
+        parameters: {
+          url: action.webhook.url || '',
+          method: action.webhook.method || 'POST',
+          headers: Object.keys(action.webhook.headers || {}).length > 0 
+            ? action.webhook.headers : undefined,
+          body: action.webhook.body || undefined,
+          fixedDelayMilliseconds: action.webhook.fixedDelayMilliseconds > 0 
+            ? action.webhook.fixedDelayMilliseconds : undefined
+        }
+      };
+    }
+    return action;
+  }).filter(action => action.name === 'webhook' && action.parameters?.url) : undefined
+```
+
+**保存逻辑优化：**
+- 确保只保存有效的webhook配置（必须有URL）
+- 清理空值，避免发送不必要的数据
+- 保持与WireMock API的完全兼容
+
+### 修复3: 优化Webhook配置组件
 
 **文件：** `src/components/StubMappings/MappingForm/WebhookConfigTab.jsx`
 
 **主要改进：**
+1. 添加合适的默认值
+2. 改进添加按钮的初始数据结构
+3. 增加PATCH方法支持
+4. 优化占位符和用户提示
 
-1. **添加默认值：**
-   ```javascript
-   // HTTP方法字段添加默认值
-   <Form.Item
-     name={[name, 'webhook', 'method']}
-     initialValue="POST"
-   >
-   
-   // 延时字段添加默认值
-   <Form.Item
-     name={[name, 'webhook', 'fixedDelayMilliseconds']}
-     initialValue={0}
-   >
-   ```
+## WireMock数据结构兼容性
 
-2. **改进添加按钮：**
-   ```javascript
-   <Button
-     onClick={() => add({ 
-       webhook: { 
-         url: '', 
-         method: 'POST', 
-         headers: {}, 
-         body: '', 
-         fixedDelayMilliseconds: 0 
-       } 
-     })}
-   >
-   ```
+现在的修复代码支持以下所有WireMock数据结构：
 
-3. **增加PATCH方法支持：**
-   ```javascript
-   <Select placeholder="选择HTTP方法">
-     <Option value="GET">GET</Option>
-     <Option value="POST">POST</Option>
-     <Option value="PUT">PUT</Option>
-     <Option value="DELETE">DELETE</Option>
-     <Option value="PATCH">PATCH</Option>  // 新增
-   </Select>
-   ```
+### 1. 标准结构（实际使用）
+```json
+{
+  "postServeActions": [
+    {
+      "name": "webhook",
+      "parameters": {
+        "url": "http://example.com/callback",
+        "method": "POST",
+        "headers": {"Content-Type": "application/json"},
+        "body": "...",
+        "fixedDelayMilliseconds": 1000
+      }
+    }
+  ]
+}
+```
 
-4. **改进占位符文本：**
-   - 为各个输入框添加了更清晰的占位符文本
-   - 提高了用户体验
+### 2. 嵌套结构（备用支持）
+```json
+{
+  "postServeActions": [
+    {
+      "webhook": {
+        "url": "http://example.com/callback",
+        "method": "POST",
+        "headers": {"Content-Type": "application/json"},
+        "body": "...",
+        "fixedDelayMilliseconds": 1000
+      }
+    }
+  ]
+}
+```
+
+### 3. 扁平化结构（备用支持）
+```json
+{
+  "postServeActions": [
+    {
+      "type": "webhook",
+      "webhookUrl": "http://example.com/callback",
+      "method": "POST",
+      "headers": {"Content-Type": "application/json"},
+      "body": "...",
+      "fixedDelayMilliseconds": 1000
+    }
+  ]
+}
+```
 
 ## 修复效果
 
-### 1. 数据兼容性提升
-- ✅ 支持多种WireMock postServeActions数据结构
-- ✅ 处理标准webhook结构：`action.webhook.*`
-- ✅ 处理扁平化结构：`action.webhookUrl`, `action.method`等
-- ✅ 提供兜底处理，确保表单不会崩溃
+### 1. 数据读取 ✅
+- 正确解析WireMock的`{ name: "webhook", parameters: {...} }`结构
+- 将URL、方法、请求头、请求体等字段正确映射到表单
+- 支持多种可能的数据结构变体
 
-### 2. 表单体验改善
-- ✅ 添加了合适的默认值，新建时体验更好
-- ✅ 编辑时能正确回填已有数据
-- ✅ 支持更多HTTP方法（包括PATCH）
-- ✅ 更清晰的占位符提示
+### 2. 数据保存 ✅
+- 将表单数据正确转换回WireMock期望的格式
+- 确保保存的数据结构与WireMock API完全兼容
+- 清理空值，优化数据传输
 
-### 3. 错误处理增强
-- ✅ 即使遇到未知的数据结构也不会报错
-- ✅ 确保表单字段始终有合理的初始值
-- ✅ 提高了组件的健壮性
+### 3. 用户体验 ✅
+- 编辑时能正确回填已有Webhook数据
+- 新建时有合理的默认值
+- 支持完整的HTTP方法选择
+- 清晰的界面提示和占位符
 
 ## 测试验证
 
-### 测试场景1: 编辑已有Webhook配置
-1. 创建一个包含Webhook的映射
-2. 保存后重新编辑
-3. 验证Webhook配置是否正确显示
+### 测试场景1: 编辑真实Webhook配置
+使用用户提供的数据结构进行测试：
+1. 加载包含Webhook的映射配置
+2. 验证URL、方法、请求头、请求体是否正确显示
+3. 修改配置并保存
+4. 验证保存后的数据格式是否正确
 
-### 测试场景2: 不同数据结构兼容性
-1. 测试标准webhook结构的数据
-2. 测试扁平化结构的数据
-3. 测试空或异常数据的处理
-
-### 测试场景3: 新建Webhook配置
+### 测试场景2: 新建Webhook配置
 1. 创建新映射
 2. 添加Webhook配置
-3. 验证默认值是否正确设置
+3. 填写各项参数
+4. 保存并验证数据格式
 
-## 技术说明
+### 测试场景3: 复杂数据处理
+1. 测试包含复杂JSON的请求体
+2. 测试多个请求头的处理
+3. 测试延时配置的保存和读取
 
-### WireMock postServeActions数据结构
+## 技术细节
 
-WireMock的postServeActions可能有多种数据结构：
+### 数据转换流程
 
-1. **标准结构：**
-   ```json
-   {
-     "postServeActions": [
-       {
-         "webhook": {
-           "url": "http://example.com/callback",
-           "method": "POST",
-           "headers": {"Content-Type": "application/json"},
-           "body": "...",
-           "fixedDelayMilliseconds": 1000
-         }
-       }
-     ]
-   }
-   ```
+**读取时：**
+```
+WireMock数据 → mapRecordToFormData → 表单数据
+{name: "webhook", parameters: {...}} → {webhook: {...}}
+```
 
-2. **扁平化结构：**
-   ```json
-   {
-     "postServeActions": [
-       {
-         "type": "webhook",
-         "webhookUrl": "http://example.com/callback",
-         "method": "POST",
-         "headers": {"Content-Type": "application/json"},
-         "body": "...",
-         "fixedDelayMilliseconds": 1000
-       }
-     ]
-   }
-   ```
+**保存时：**
+```
+表单数据 → handleSave → WireMock数据
+{webhook: {...}} → {name: "webhook", parameters: {...}}
+```
 
-现在的修复代码能够处理这两种结构以及其他可能的变体。
+### 关键改进点
+
+1. **准确的数据结构识别** - 基于真实数据结构进行映射
+2. **双向数据转换** - 读取和保存都有对应的转换逻辑
+3. **多结构兼容** - 支持多种可能的数据结构
+4. **数据清理** - 避免保存空值和无效数据
 
 ## 总结
 
-通过这次修复：
+通过这次基于真实数据结构的修复：
 
-1. **解决了核心问题** - Webhook配置现在能够正确显示已有数据
-2. **提升了兼容性** - 支持多种WireMock数据结构
-3. **改善了用户体验** - 更好的默认值和提示信息
-4. **增强了稳定性** - 更好的错误处理和兜底机制
+1. **解决了核心问题** - Webhook配置现在能够正确显示和保存
+2. **提升了数据兼容性** - 支持WireMock的实际数据结构
+3. **改善了用户体验** - 完整的编辑和新建流程
+4. **增强了系统稳定性** - 更好的错误处理和数据验证
 
-用户现在可以正常编辑已有的Webhook配置，所有字段都会正确回填显示。
+现在用户可以正常编辑已有的Webhook配置，所有字段都会正确回填显示，保存时也会生成正确的WireMock格式数据。
+
+**关键修复文件：**
+- `src/components/StubMappings/hooks/useFormInitialization.js` - 数据读取映射
+- `src/components/StubMappings/hooks/useMappingOperations.js` - 数据保存映射
+- `src/components/StubMappings/MappingForm/WebhookConfigTab.jsx` - 界面组件优化

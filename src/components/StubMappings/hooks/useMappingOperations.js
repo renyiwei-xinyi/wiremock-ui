@@ -54,7 +54,25 @@ export const useMappingOperations = (fetchMappings) => {
           delayDistribution: (values.response.delayDistribution?.lower > 0 || values.response.delayDistribution?.upper > 0)
             ? values.response.delayDistribution : undefined
         },
-        postServeActions: values.postServeActions?.length > 0 ? values.postServeActions : undefined
+        postServeActions: values.postServeActions?.length > 0 ? 
+          values.postServeActions.map(action => {
+            // 将表单数据转换回WireMock期望的格式
+            if (action.webhook) {
+              return {
+                name: 'webhook',
+                parameters: {
+                  url: action.webhook.url || '',
+                  method: action.webhook.method || 'POST',
+                  headers: Object.keys(action.webhook.headers || {}).length > 0 
+                    ? action.webhook.headers : undefined,
+                  body: action.webhook.body || undefined,
+                  fixedDelayMilliseconds: action.webhook.fixedDelayMilliseconds > 0 
+                    ? action.webhook.fixedDelayMilliseconds : undefined
+                }
+              };
+            }
+            return action;
+          }).filter(action => action.name === 'webhook' && action.parameters?.url) : undefined
       };
 
       if (selectedMapping) {

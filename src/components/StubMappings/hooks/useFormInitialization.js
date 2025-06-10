@@ -38,11 +38,11 @@ export const mapRecordToFormData = (record) => {
     scenarioName: record.scenarioName || '',
     requiredScenarioState: record.requiredScenarioState || '',
     newScenarioState: record.newScenarioState || '',
-    comment: record.comment || '',
+    comment: record.comment || record.metadata?.wmui?.description || '',
     request: {
       method: record.request?.method || 'GET',
-      urlPath: record.request?.urlPath || record.request?.url || record.request?.urlPattern || record.request?.urlPathPattern || '/',
-      urlPathPattern: record.request?.urlPathPattern || '',
+      urlPath: record.request?.urlPath || record.request?.url || '/',
+      urlPathPattern: record.request?.urlPathPattern || record.request?.urlPattern || '',
       queryParameters: record.request?.queryParameters || {},
       headers: record.request?.headers || {},
       cookies: record.request?.cookies || {},
@@ -60,9 +60,20 @@ export const mapRecordToFormData = (record) => {
       delayDistribution: record.response?.delayDistribution || { type: 'uniform', lower: 0, upper: 0 }
     },
     postServeActions: (record.postServeActions || []).map(action => {
-      // 处理不同的postServeActions数据结构
-      if (action.webhook) {
-        // 标准的webhook结构
+      // 处理WireMock实际的postServeActions数据结构
+      if (action.name === 'webhook' && action.parameters) {
+        // WireMock标准的webhook结构: { name: "webhook", parameters: {...} }
+        return {
+          webhook: {
+            url: action.parameters.url || '',
+            method: action.parameters.method || 'POST',
+            headers: action.parameters.headers || {},
+            body: action.parameters.body || '',
+            fixedDelayMilliseconds: action.parameters.fixedDelayMilliseconds || 0
+          }
+        };
+      } else if (action.webhook) {
+        // 嵌套的webhook结构: { webhook: {...} }
         return {
           webhook: {
             url: action.webhook.url || '',
@@ -73,7 +84,7 @@ export const mapRecordToFormData = (record) => {
           }
         };
       } else if (action.type === 'webhook' || action.webhookUrl) {
-        // 其他可能的webhook数据结构
+        // 扁平化结构
         return {
           webhook: {
             url: action.webhookUrl || action.url || '',
