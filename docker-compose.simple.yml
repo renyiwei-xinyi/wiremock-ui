@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  wiremock-ui:
+    image: wiremock-ui:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    container_name: wiremock-ui
+    ports:
+      - "3001:3000"
+    environment:
+      NODE_ENV: production
+    command: npm start
+    restart: always
