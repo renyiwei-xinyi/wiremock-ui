@@ -20,7 +20,7 @@ import {
   UploadOutlined,
 } from '@ant-design/icons';
 import { stubMappingsApi } from '../services/wiremockApi';
-import { createColumns } from './StubMappings/tableColumns';
+import { createColumns } from './StubMappings/tableColumns.jsx';
 import { useMappingHandlers } from './StubMappings/useMappingHandlers';
 import { handleExport, handleImport, filterMappings } from './StubMappings/importExportUtils';
 import MappingForm from './StubMappings/MappingForm';

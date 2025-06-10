@@ -17,7 +17,7 @@ import {
   SearchOutlined,
 } from '@ant-design/icons';
 import { requestsApi } from '../services/wiremockApi';
-import { createColumns } from './Requests/tableColumns';
+import { createColumns } from './Requests/tableColumns.jsx';
 import { filterRequests } from './Requests/filterUtils';
 import RequestDetail from './Requests/RequestDetail';
 
