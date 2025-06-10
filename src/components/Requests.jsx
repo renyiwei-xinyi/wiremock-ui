@@ -182,13 +182,6 @@ const Requests = () => {
       ),
     },
     {
-      title: '响应时间',
-      dataIndex: 'responseTime',
-      key: 'responseTime',
-      width: 100,
-      render: (time) => time ? `${time}ms` : '-',
-    },
-    {
       title: '操作',
       key: 'actions',
       width: 100,

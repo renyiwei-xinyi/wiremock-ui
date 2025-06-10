@@ -775,7 +775,6 @@ const StubMappings = () => {
                           {...restField}
                           label="URL"
                           name={[name, 'webhook', 'url']}
-                          initialValue="{{jsonPath request.body '$.data.callbackUrl'}}"
                           rules={[{ required: true, message: '请输入Webhook URL' }]}
                         >
                           <Input placeholder="{{jsonPath request.body '$.data.callbackUrl'}}" />
@@ -785,7 +784,6 @@ const StubMappings = () => {
                           {...restField}
                           label="HTTP方法"
                           name={[name, 'webhook', 'method']}
-                          initialValue="POST"
                         >
                           <Select>
                             <Option value="GET">GET</Option>
@@ -891,7 +889,20 @@ const StubMappings = () => {
             <Editor
               height="200px"
               language="json"
-              value={JSON.stringify(selectedMapping.response, null, 2)}
+              value={JSON.stringify({
+                ...selectedMapping.response,
+                // 格式化body字段，去除转义
+                body: selectedMapping.response?.body ? 
+                  (typeof selectedMapping.response.body === 'string' ? 
+                    (() => {
+                      try {
+                        return JSON.parse(selectedMapping.response.body);
+                      } catch {
+                        return selectedMapping.response.body;
+                      }
+                    })() : selectedMapping.response.body
+                  ) : undefined
+              }, null, 2)}
               options={{ readOnly: true, minimap: { enabled: false } }}
             />
 
