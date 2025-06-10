@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Layout, Menu, Typography, Badge, notification, Spin } from 'antd';
 import {
   ApiOutlined,
@@ -20,12 +20,26 @@ import { systemApi } from './services/wiremockApi';
 const { Header, Sider, Content } = Layout;
 const { Title } = Typography;
 
-function App() {
+// 内部组件，用于处理导航逻辑
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
-  const [selectedKey, setSelectedKey] = useState('dashboard');
   const [systemInfo, setSystemInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState('connecting');
+
+  // 根据当前路径设置选中的菜单项
+  const getSelectedKey = () => {
+    const path = location.pathname;
+    if (path === '/' || path === '/dashboard') return 'dashboard';
+    if (path === '/stub-mappings') return 'stub-mappings';
+    if (path === '/requests') return 'requests';
+    if (path === '/scenarios') return 'scenarios';
+    if (path === '/recording') return 'recording';
+    if (path === '/settings') return 'settings';
+    return 'dashboard';
+  };
 
   // 检查 WireMock 连接状态
   const checkConnection = async () => {
@@ -99,6 +113,22 @@ function App() {
     return statusConfig[connectionStatus];
   };
 
+  // 处理菜单点击，导航到对应路由
+  const handleMenuClick = ({ key }) => {
+    const routeMap = {
+      'dashboard': '/dashboard',
+      'stub-mappings': '/stub-mappings',
+      'requests': '/requests',
+      'scenarios': '/scenarios',
+      'recording': '/recording',
+      'settings': '/settings',
+    };
+    
+    if (routeMap[key]) {
+      navigate(routeMap[key]);
+    }
+  };
+
   if (loading) {
     return (
       <div className="loading-spinner">
@@ -108,59 +138,65 @@ function App() {
   }
 
   return (
-    <Router>
+    <Layout>
+      <Header style={{ padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <ApiOutlined style={{ fontSize: '24px', color: '#fff', marginRight: '12px' }} />
+          <Title level={3} style={{ color: '#fff', margin: 0 }}>
+            WireMock UI
+          </Title>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Badge {...getConnectionBadge()}>
+            <span style={{ color: '#fff', fontSize: '14px' }}>
+              {systemInfo ? `v${systemInfo.version || 'Unknown'}` : 'WireMock'}
+            </span>
+          </Badge>
+        </div>
+      </Header>
+
       <Layout>
-        <Header style={{ padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <ApiOutlined style={{ fontSize: '24px', color: '#fff', marginRight: '12px' }} />
-            <Title level={3} style={{ color: '#fff', margin: 0 }}>
-              WireMock UI
-            </Title>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <Badge {...getConnectionBadge()}>
-              <span style={{ color: '#fff', fontSize: '14px' }}>
-                {systemInfo ? `v${systemInfo.version || 'Unknown'}` : 'WireMock'}
-              </span>
-            </Badge>
-          </div>
-        </Header>
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={setCollapsed}
+          width={250}
+          theme="light"
+        >
+          <Menu
+            mode="inline"
+            selectedKeys={[getSelectedKey()]}
+            items={menuItems}
+            style={{ height: '100%', borderRight: 0 }}
+            onClick={handleMenuClick}
+          />
+        </Sider>
 
         <Layout>
-          <Sider
-            collapsible
-            collapsed={collapsed}
-            onCollapse={setCollapsed}
-            width={250}
-            theme="light"
-          >
-            <Menu
-              mode="inline"
-              selectedKeys={[selectedKey]}
-              items={menuItems}
-              style={{ height: '100%', borderRight: 0 }}
-              onClick={({ key }) => setSelectedKey(key)}
-            />
-          </Sider>
-
-          <Layout>
-            <Content>
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route 
-                  path="/dashboard" 
-                  element={<Dashboard systemInfo={systemInfo} connectionStatus={connectionStatus} />} 
-                />
-                <Route path="/stub-mappings" element={<StubMappings />} />
-                <Route path="/requests" element={<Requests />} />
-                <Route path="/scenarios" element={<Scenarios />} />
-                <Route path="/recording" element={<Recording />} />
-                <Route path="/settings" element={<Settings />} />
-              </Routes>
-            </Content>
-          </Layout>
+          <Content>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route 
+                path="/dashboard" 
+                element={<Dashboard systemInfo={systemInfo} connectionStatus={connectionStatus} />} 
+              />
+              <Route path="/stub-mappings" element={<StubMappings />} />
+              <Route path="/requests" element={<Requests />} />
+              <Route path="/scenarios" element={<Scenarios />} />
+              <Route path="/recording" element={<Recording />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </Content>
         </Layout>
       </Layout>
+    </Layout>
+  );
+}
+
+function App() {
+  return (
+    <Router>
+      <AppContent />
     </Router>
   );
 }
