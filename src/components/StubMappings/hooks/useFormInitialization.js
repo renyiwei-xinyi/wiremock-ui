@@ -59,14 +59,42 @@ export const mapRecordToFormData = (record) => {
       fixedDelayMilliseconds: record.response?.fixedDelayMilliseconds || 0,
       delayDistribution: record.response?.delayDistribution || { type: 'uniform', lower: 0, upper: 0 }
     },
-    postServeActions: (record.postServeActions || []).map(action => ({
-      webhook: {
-        url: action.webhook?.url || '',
-        method: action.webhook?.method || 'POST',
-        headers: action.webhook?.headers || {},
-        body: action.webhook?.body || '',
-        fixedDelayMilliseconds: action.webhook?.fixedDelayMilliseconds || 0
+    postServeActions: (record.postServeActions || []).map(action => {
+      // 处理不同的postServeActions数据结构
+      if (action.webhook) {
+        // 标准的webhook结构
+        return {
+          webhook: {
+            url: action.webhook.url || '',
+            method: action.webhook.method || 'POST',
+            headers: action.webhook.headers || {},
+            body: action.webhook.body || '',
+            fixedDelayMilliseconds: action.webhook.fixedDelayMilliseconds || 0
+          }
+        };
+      } else if (action.type === 'webhook' || action.webhookUrl) {
+        // 其他可能的webhook数据结构
+        return {
+          webhook: {
+            url: action.webhookUrl || action.url || '',
+            method: action.method || 'POST',
+            headers: action.headers || {},
+            body: action.body || '',
+            fixedDelayMilliseconds: action.fixedDelayMilliseconds || 0
+          }
+        };
+      } else {
+        // 兜底处理，确保有基本结构
+        return {
+          webhook: {
+            url: '',
+            method: 'POST',
+            headers: {},
+            body: '',
+            fixedDelayMilliseconds: 0
+          }
+        };
       }
-    }))
+    })
   };
 };

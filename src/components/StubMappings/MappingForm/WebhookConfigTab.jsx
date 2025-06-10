@@ -38,12 +38,14 @@ const WebhookConfigTab = () => {
                 {...restField}
                 label="HTTP方法"
                 name={[name, 'webhook', 'method']}
+                initialValue="POST"
               >
-                <Select>
+                <Select placeholder="选择HTTP方法">
                   <Option value="GET">GET</Option>
                   <Option value="POST">POST</Option>
                   <Option value="PUT">PUT</Option>
                   <Option value="DELETE">DELETE</Option>
+                  <Option value="PATCH">PATCH</Option>
                 </Select>
               </Form.Item>
 
@@ -67,14 +69,23 @@ const WebhookConfigTab = () => {
                 {...restField}
                 label="延时(ms)"
                 name={[name, 'webhook', 'fixedDelayMilliseconds']}
+                initialValue={0}
               >
-                <InputNumber min={0} style={{ width: '100%' }} />
+                <InputNumber min={0} style={{ width: '100%' }} placeholder="延时毫秒数" />
               </Form.Item>
             </Card>
           ))}
           <Button
             type="dashed"
-            onClick={() => add()}
+            onClick={() => add({ 
+              webhook: { 
+                url: '', 
+                method: 'POST', 
+                headers: {}, 
+                body: '', 
+                fixedDelayMilliseconds: 0 
+              } 
+            })}
             block
             icon={<PlusOutlined />}
           >
