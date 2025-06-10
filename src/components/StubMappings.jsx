@@ -80,7 +80,10 @@ const StubMappings = () => {
     try {
       const updatedMapping = {
         ...record,
-        persistent: enabled
+        response: {
+          ...record.response,
+          fromConfiguredStub: enabled
+        }
       };
       
       await stubMappingsApi.update(record.id, updatedMapping);

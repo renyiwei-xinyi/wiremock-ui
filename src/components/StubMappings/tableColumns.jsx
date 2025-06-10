@@ -33,10 +33,10 @@ export const createColumns = (handlers) => {
       width: 80,
       render: (_, record) => (
         <Switch
-          checked={record.persistent !== false}
+          checked={record.response?.fromConfiguredStub !== false}
           onChange={(checked) => handleToggleStatus(record, checked)}
           size="small"
-          title={record.persistent !== false ? '已启用' : '已禁用'}
+          title={record.response?.fromConfiguredStub !== false ? '已启用' : '已禁用'}
         />
       ),
     },
@@ -47,8 +47,8 @@ export const createColumns = (handlers) => {
       render: (text, record) => (
         <div>
           <div style={{ 
-            opacity: record.persistent !== false ? 1 : 0.6,
-            textDecoration: record.persistent === false ? 'line-through' : 'none'
+            opacity: record.response?.fromConfiguredStub !== false ? 1 : 0.6,
+            textDecoration: record.response?.fromConfiguredStub === false ? 'line-through' : 'none'
           }}>
             {text || `${record.request?.method} ${record.request?.urlPath || record.request?.urlPathPattern}`}
           </div>
