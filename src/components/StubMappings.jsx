@@ -183,27 +183,6 @@ const StubMappings = () => {
   const handleEdit = (record) => {
     setSelectedMapping(record);
     
-    // 确定URL匹配模式
-    let urlMatchType = 'urlPath';
-    let urlValue = '/';
-    
-    if (record.request?.urlPath) {
-      urlMatchType = 'urlPath';
-      urlValue = record.request.urlPath;
-    } else if (record.request?.urlPathPattern) {
-      urlMatchType = 'urlPathPattern';
-      urlValue = record.request.urlPathPattern;
-    } else if (record.request?.url) {
-      urlMatchType = 'url';
-      urlValue = record.request.url;
-    } else if (record.request?.urlPattern) {
-      urlMatchType = 'urlPattern';
-      urlValue = record.request.urlPattern;
-    } else if (record.request?.urlEqualTo) {
-      urlMatchType = 'urlEqualTo';
-      urlValue = record.request.urlEqualTo;
-    }
-    
     // 正确回写所有配置数据到表单
     const formData = {
       name: record.name || '',
@@ -212,10 +191,10 @@ const StubMappings = () => {
       requiredScenarioState: record.requiredScenarioState || '',
       newScenarioState: record.newScenarioState || '',
       comment: record.comment || '',
-      urlMatchType: urlMatchType,
       request: {
         method: record.request?.method || 'GET',
-        urlPath: urlValue,
+        urlPath: record.request?.urlPath || record.request?.url || record.request?.urlPattern || record.request?.urlPathPattern || '/',
+        urlPathPattern: record.request?.urlPathPattern || '',
         queryParameters: record.request?.queryParameters || {},
         headers: record.request?.headers || {},
         cookies: record.request?.cookies || {},
@@ -226,7 +205,7 @@ const StubMappings = () => {
         status: record.response?.status || 200,
         statusMessage: record.response?.statusMessage || '',
         headers: record.response?.headers || {},
-        body: record.response?.body || '{}',
+        body: record.response?.body || (record.response?.jsonBody ? JSON.stringify(record.response.jsonBody, null, 2) : '{}'),
         fixedDelayMilliseconds: record.response?.fixedDelayMilliseconds || 0,
         delayDistribution: record.response?.delayDistribution || { type: 'uniform', lower: 0, upper: 0 }
       },
@@ -275,36 +254,6 @@ const StubMappings = () => {
   // 保存映射
   const handleSave = async (values) => {
     try {
-      // 根据URL匹配模式构建请求对象
-      const request = {
-        method: values.request.method,
-        queryParameters: Object.keys(values.request.queryParameters || {}).length > 0 
-          ? values.request.queryParameters : undefined,
-        headers: Object.keys(values.request.headers || {}).length > 0 
-          ? values.request.headers : undefined,
-        cookies: Object.keys(values.request.cookies || {}).length > 0 
-          ? values.request.cookies : undefined,
-        basicAuth: (values.request.basicAuth?.username || values.request.basicAuth?.password) 
-          ? values.request.basicAuth : undefined,
-        body: values.request.body || undefined
-      };
-
-      // 根据选择的URL匹配模式设置相应的URL字段
-      const urlValue = values.request.urlPath;
-      if (values.urlMatchType === 'any') {
-        // Any URL 不需要设置URL字段
-      } else if (values.urlMatchType === 'urlPath') {
-        request.urlPath = urlValue;
-      } else if (values.urlMatchType === 'urlPathPattern') {
-        request.urlPathPattern = urlValue;
-      } else if (values.urlMatchType === 'url') {
-        request.url = urlValue;
-      } else if (values.urlMatchType === 'urlPattern') {
-        request.urlPattern = urlValue;
-      } else if (values.urlMatchType === 'urlEqualTo') {
-        request.urlEqualTo = urlValue;
-      }
-
       const cleanedValues = {
         name: values.name || undefined,
         priority: values.priority || undefined,
@@ -312,7 +261,20 @@ const StubMappings = () => {
         requiredScenarioState: values.requiredScenarioState || undefined,
         newScenarioState: values.newScenarioState || undefined,
         comment: values.comment || undefined,
-        request: request,
+        request: {
+          method: values.request.method,
+          urlPath: values.request.urlPath || undefined,
+          urlPathPattern: values.request.urlPathPattern || undefined,
+          queryParameters: Object.keys(values.request.queryParameters || {}).length > 0 
+            ? values.request.queryParameters : undefined,
+          headers: Object.keys(values.request.headers || {}).length > 0 
+            ? values.request.headers : undefined,
+          cookies: Object.keys(values.request.cookies || {}).length > 0 
+            ? values.request.cookies : undefined,
+          basicAuth: (values.request.basicAuth?.username || values.request.basicAuth?.password) 
+            ? values.request.basicAuth : undefined,
+          body: values.request.body || undefined
+        },
         response: {
           ...values.response,
           headers: Object.keys(values.response.headers || {}).length > 0 
@@ -422,6 +384,10 @@ const StubMappings = () => {
     const searchLower = searchText.toLowerCase();
     return (
       mapping.request?.urlPath?.toLowerCase().includes(searchLower) ||
+      mapping.request?.urlPathPattern?.toLowerCase().includes(searchLower) ||
+      mapping.request?.urlPattern?.toLowerCase().includes(searchLower) ||
+      mapping.request?.url?.toLowerCase().includes(searchLower) ||
+      mapping.request?.urlEqualTo?.toLowerCase().includes(searchLower) ||
       mapping.request?.method?.toLowerCase().includes(searchLower) ||
       mapping.name?.toLowerCase().includes(searchLower) ||
       mapping.comment?.toLowerCase().includes(searchLower)
@@ -639,32 +605,20 @@ const StubMappings = () => {
                     </Select>
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col span={16}>
                   <Form.Item
-                    label="URL匹配模式"
-                    name="urlMatchType"
-                    initialValue="urlPath"
-                  >
-                    <Select>
-                      <Option value="urlPath">Path and Query</Option>
-                      <Option value="urlPathPattern">Path and Query Regex</Option>
-                      <Option value="url">Path</Option>
-                      <Option value="urlPattern">Path Regex</Option>
-                      <Option value="urlEqualTo">Exact URL</Option>
-                      <Option value="any">Any URL</Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item
-                    label="URL值"
+                    label="URL路径"
                     name={['request', 'urlPath']}
-                    rules={[{ required: true, message: '请输入URL值' }]}
+                    rules={[{ required: true, message: '请输入URL路径' }]}
                   >
                     <Input placeholder="/api/example" />
                   </Form.Item>
                 </Col>
               </Row>
+
+              <Form.Item label="URL路径模式" name={['request', 'urlPathPattern']}>
+                <Input placeholder="/api/users/[0-9]+" />
+              </Form.Item>
 
               <Collapse>
                 <Panel header="查询参数" key="params">
