@@ -4,39 +4,39 @@ import { SendOutlined, CloseOutlined } from '@ant-design/icons';
 
 const { Option } = Select;
 
-const RequestConfigSection = ({ form, onSendRequest, loading, mockServiceUrl }) => {
-  // 动态表单项组件
-  const DynamicFormList = ({ name, placeholder }) => (
-    <Form.List name={name}>
-      {(fields, { add, remove }) => (
-        <>
-          {fields.map(({ key, name: fieldName, ...restField }) => (
-            <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
-              <Form.Item
-                {...restField}
-                name={[fieldName, 'name']}
-                style={{ margin: 0, width: 150 }}
-              >
-                <Input placeholder="名称" />
-              </Form.Item>
-              <Form.Item
-                {...restField}
-                name={[fieldName, 'value']}
-                style={{ margin: 0, flex: 1 }}
-              >
-                <Input placeholder="值" />
-              </Form.Item>
-              <Button type="text" danger onClick={() => remove(fieldName)} icon={<CloseOutlined />} />
-            </Space>
-          ))}
-          <Button type="dashed" onClick={() => add()} block>
-            添加{placeholder}
-          </Button>
-        </>
-      )}
-    </Form.List>
-  );
+// 动态表单项组件
+const DynamicFormList = ({ name, placeholder }) => (
+  <Form.List name={name}>
+    {(fields, { add, remove }) => (
+      <>
+        {fields.map(({ key, name: fieldName, ...restField }) => (
+          <Space key={key} style={{ display: 'flex', marginBottom: 8 }} align="baseline">
+            <Form.Item
+              {...restField}
+              name={[fieldName, 'name']}
+              style={{ margin: 0, width: 150 }}
+            >
+              <Input placeholder="名称" />
+            </Form.Item>
+            <Form.Item
+              {...restField}
+              name={[fieldName, 'value']}
+              style={{ margin: 0, flex: 1 }}
+            >
+              <Input placeholder="值" />
+            </Form.Item>
+            <Button type="text" danger onClick={() => remove(fieldName)} icon={<CloseOutlined />} />
+          </Space>
+        ))}
+        <Button type="dashed" onClick={() => add()} block>
+          添加{placeholder}
+        </Button>
+      </>
+    )}
+  </Form.List>
+);
 
+const RequestConfigSection = ({ form, onSendRequest, loading, mockServiceUrl }) => {
   return (
     <Space.Compact style={{ width: '100%', marginBottom: 16 }}>
       <Form.Item name="method" style={{ margin: 0 }}>
