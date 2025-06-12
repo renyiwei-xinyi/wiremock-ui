@@ -6,13 +6,18 @@ import {
   Card,
   Tabs,
   Tag,
+  Switch,
+  Alert,
 } from 'antd';
 import {
   PlayCircleOutlined,
+  ExperimentOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
 import RequestConfigSection, { DynamicFormList } from './ApiTester/RequestConfigSection';
 import ResponseSection from './ApiTester/ResponseSection';
+import EmbeddedApiTester from './ApiTester/EmbeddedApiTester';
 import { useApiTester } from './ApiTester/hooks/useApiTester';
 
 const { TabPane } = Tabs;
@@ -20,6 +25,7 @@ const { TabPane } = Tabs;
 const ApiTester = ({ visible, onClose, mapping }) => {
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('headers');
+  const [useEmbeddedTool, setUseEmbeddedTool] = useState(true);
 
   // Mock服务域名
   const mockServiceUrl = 'http://os.wiremock.server.qa.17u.cn';
@@ -169,62 +175,98 @@ const ApiTester = ({ visible, onClose, mapping }) => {
       destroyOnClose
     >
       <div style={{ height: '70vh', display: 'flex', flexDirection: 'column' }}>
-        <Form 
-          form={form} 
-          layout="vertical" 
-          style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-          initialValues={{
-            method: 'GET',
-            url: '/',
-            headers: [],
-            queryParams: [],
-            body: ''
-          }}
-        >
-          {/* 请求配置区域 */}
-          <Card size="small" style={{ marginBottom: 16 }}>
-            <RequestConfigSection
-              form={form}
-              onSendRequest={handleSendRequest}
-              loading={loading}
-              mockServiceUrl={mockServiceUrl}
+        {/* 工具选择器 */}
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Space align="center">
+            <ExperimentOutlined />
+            <span>测试工具模式：</span>
+            <Switch
+              checked={useEmbeddedTool}
+              onChange={setUseEmbeddedTool}
+              checkedChildren={<><ThunderboltOutlined /> 专业工具</>}
+              unCheckedChildren="内置工具"
             />
+            {useEmbeddedTool && (
+              <Tag color="green">推荐：避免CORS问题</Tag>
+            )}
+          </Space>
+          
+          {!useEmbeddedTool && (
+            <Alert
+              message="CORS 警告"
+              description="内置工具可能遇到CORS跨域问题，建议使用专业工具模式获得更好的体验。"
+              type="warning"
+              showIcon
+              style={{ marginTop: 12 }}
+            />
+          )}
+        </Card>
 
-            {/* 请求参数标签页 */}
-            <Tabs activeKey={activeTab} onChange={setActiveTab} size="small">
-              <TabPane tab="请求头" key="headers">
-                <DynamicFormList name="headers" placeholder="请求头" />
-              </TabPane>
-              <TabPane tab="查询参数" key="queryParams">
-                <DynamicFormList name="queryParams" placeholder="查询参数" />
-              </TabPane>
-              <TabPane tab="请求体" key="body">
-                <Form.Item name="body">
-                  <Editor
-                    height="200px"
-                    defaultLanguage="json"
-                    options={{
-                      minimap: { enabled: false },
-                      scrollBeyondLastLine: false,
-                      wordWrap: 'on'
-                    }}
-                  />
-                </Form.Item>
-              </TabPane>
-            </Tabs>
-          </Card>
-
-          {/* 响应区域 */}
-          <ResponseSection
-            response={response}
-            loading={loading}
-            onCopyResponse={copyResponse}
-            requestHistory={requestHistory}
-            onCopyAsCurl={copyAsCurl}
-            onResendFromHistory={handleResendFromHistory}
-            onClearHistory={clearHistory}
+        {useEmbeddedTool ? (
+          /* 嵌入式专业工具 */
+          <EmbeddedApiTester 
+            mapping={mapping} 
+            mockServiceUrl={mockServiceUrl}
           />
-        </Form>
+        ) : (
+          /* 原有的内置工具 */
+          <Form 
+            form={form} 
+            layout="vertical" 
+            style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+            initialValues={{
+              method: 'GET',
+              url: '/',
+              headers: [],
+              queryParams: [],
+              body: ''
+            }}
+          >
+            {/* 请求配置区域 */}
+            <Card size="small" style={{ marginBottom: 16 }}>
+              <RequestConfigSection
+                form={form}
+                onSendRequest={handleSendRequest}
+                loading={loading}
+                mockServiceUrl={mockServiceUrl}
+              />
+
+              {/* 请求参数标签页 */}
+              <Tabs activeKey={activeTab} onChange={setActiveTab} size="small">
+                <TabPane tab="请求头" key="headers">
+                  <DynamicFormList name="headers" placeholder="请求头" />
+                </TabPane>
+                <TabPane tab="查询参数" key="queryParams">
+                  <DynamicFormList name="queryParams" placeholder="查询参数" />
+                </TabPane>
+                <TabPane tab="请求体" key="body">
+                  <Form.Item name="body">
+                    <Editor
+                      height="200px"
+                      defaultLanguage="json"
+                      options={{
+                        minimap: { enabled: false },
+                        scrollBeyondLastLine: false,
+                        wordWrap: 'on'
+                      }}
+                    />
+                  </Form.Item>
+                </TabPane>
+              </Tabs>
+            </Card>
+
+            {/* 响应区域 */}
+            <ResponseSection
+              response={response}
+              loading={loading}
+              onCopyResponse={copyResponse}
+              requestHistory={requestHistory}
+              onCopyAsCurl={copyAsCurl}
+              onResendFromHistory={handleResendFromHistory}
+              onClearHistory={clearHistory}
+            />
+          </Form>
+        )}
       </div>
     </Modal>
   );
