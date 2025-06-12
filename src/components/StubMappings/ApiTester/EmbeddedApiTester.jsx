@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Space, Typography, Alert, Divider } from 'antd';
-import { ExternalLinkOutlined, ReloadOutlined } from '@ant-design/icons';
+import { LinkOutlined, ReloadOutlined } from '@ant-design/icons';
 
 const { Text, Paragraph } = Typography;
 
@@ -77,19 +77,19 @@ const EmbeddedApiTester = ({ mapping, mockServiceUrl }) => {
           <Space wrap>
             <Button 
               type="primary" 
-              icon={<ExternalLinkOutlined />}
+              icon={<LinkOutlined />}
               onClick={() => window.open(buildHoppscotchUrl(), '_blank')}
             >
               Hoppscotch (推荐)
             </Button>
             <Button 
-              icon={<ExternalLinkOutlined />}
+              icon={<LinkOutlined />}
               onClick={() => window.open(buildPostmanUrl(), '_blank')}
             >
               Postman Web
             </Button>
             <Button 
-              icon={<ExternalLinkOutlined />}
+              icon={<LinkOutlined />}
               onClick={() => window.open(buildInsomniaUrl(), '_blank')}
             >
               Insomnia
