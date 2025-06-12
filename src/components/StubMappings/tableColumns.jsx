@@ -5,6 +5,7 @@ import {
   EditOutlined,
   CopyOutlined,
   DeleteOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
 
 const { Text } = Typography;
@@ -24,7 +25,7 @@ const getMethodTag = (method) => {
 
 // 创建表格列配置
 export const createColumns = (handlers) => {
-  const { handleView, handleEdit, handleCopy, handleDelete, handleToggleStatus } = handlers;
+  const { handleView, handleEdit, handleCopy, handleDelete, handleToggleStatus, handleTest } = handlers;
 
   return [
     {
@@ -108,9 +109,16 @@ export const createColumns = (handlers) => {
     {
       title: '操作',
       key: 'actions',
-      width: 250,
+      width: 280,
       render: (_, record) => (
         <Space>
+          <Button 
+            type="text" 
+            icon={<PlayCircleOutlined />} 
+            onClick={() => handleTest(record)} 
+            title="测试API"
+            style={{ color: '#52c41a' }}
+          />
           <Button type="text" icon={<EyeOutlined />} onClick={() => handleView(record)} title="查看详情" />
           <Button type="text" icon={<EditOutlined />} onClick={() => handleEdit(record)} title="编辑" />
           <Button type="text" icon={<CopyOutlined />} onClick={() => handleCopy(record)} title="复制" />

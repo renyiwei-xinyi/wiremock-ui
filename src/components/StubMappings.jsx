@@ -25,6 +25,7 @@ import { useMappingHandlers } from './StubMappings/useMappingHandlers';
 import { handleExport, handleImport, filterMappings } from './StubMappings/importExportUtils';
 import MappingForm from './StubMappings/MappingForm';
 import MappingDetail from './StubMappings/MappingDetail';
+import ApiTester from './StubMappings/ApiTester';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -35,6 +36,10 @@ const StubMappings = () => {
   const [searchText, setSearchText] = useState('');
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [form] = Form.useForm();
+  
+  // API测试相关状态
+  const [apiTesterVisible, setApiTesterVisible] = useState(false);
+  const [testMapping, setTestMapping] = useState(null);
 
   // 获取所有映射
   const fetchMappings = async () => {
@@ -75,6 +80,12 @@ const StubMappings = () => {
     handleSave,
   } = useMappingHandlers(form, fetchMappings);
 
+  // 处理API测试
+  const handleTest = (record) => {
+    setTestMapping(record);
+    setApiTesterVisible(true);
+  };
+
   // 切换映射启用状态
   const handleToggleStatus = async (record, enabled) => {
     try {
@@ -108,6 +119,7 @@ const StubMappings = () => {
     handleCopy,
     handleDelete,
     handleToggleStatus,
+    handleTest,
   });
 
   // 过滤映射数据
@@ -169,7 +181,7 @@ const StubMappings = () => {
             映射配置是 WireMock 的核心功能，用于定义如何匹配传入的 HTTP 请求并返回相应的响应。
             每个映射包含请求匹配条件（URL、方法、头部等）和响应配置（状态码、响应体、延时等）。
             您可以创建多个映射来模拟不同的 API 端点，支持正则表达式匹配、场景状态管理和 Webhook 回调。
-            使用状态开关可以快速启用或禁用特定的映射规则。
+            使用状态开关可以快速启用或禁用特定的映射规则。点击 <Text code style={{ color: '#52c41a' }}>测试API</Text> 按钮可以直接测试映射配置。
           </Text>
         </div>
         
@@ -222,6 +234,13 @@ const StubMappings = () => {
       >
         <MappingDetail mapping={selectedMapping} />
       </Drawer>
+
+      {/* API测试工具 */}
+      <ApiTester
+        visible={apiTesterVisible}
+        onClose={() => setApiTesterVisible(false)}
+        mapping={testMapping}
+      />
     </div>
   );
 };

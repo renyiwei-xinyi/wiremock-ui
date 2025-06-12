@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Typography, Alert, Button, Space, Divider } from 'antd';
+import { Card, Row, Col, Statistic, Typography, Alert, Button, Space, Divider, message } from 'antd';
 import {
   ApiOutlined,
   HistoryOutlined,
@@ -8,11 +8,13 @@ import {
   ReloadOutlined,
   PlayCircleOutlined,
   SettingOutlined,
+  LinkOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { stubMappingsApi, requestsApi, systemApi } from '../services/wiremockApi';
 
-const { Title, Paragraph } = Typography;
+const { Title, Paragraph, Text } = Typography;
 
 const Dashboard = ({ connectionStatus }) => {
   const navigate = useNavigate();
@@ -23,6 +25,9 @@ const Dashboard = ({ connectionStatus }) => {
     loading: true,
   });
   const [systemInfo, setSystemInfo] = useState(null);
+
+  // Mock服务域名
+  const mockServiceUrl = 'http://os.wiremock.server.qa.17u.cn';
 
   const fetchStats = async () => {
     try {
@@ -86,6 +91,14 @@ const Dashboard = ({ connectionStatus }) => {
     fetchStats();
   };
 
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(mockServiceUrl).then(() => {
+      message.success('Mock服务地址已复制到剪贴板');
+    }).catch(() => {
+      message.error('复制失败，请手动复制');
+    });
+  };
+
   const getStatusAlert = () => {
     if (connectionStatus === 'connected') {
       return (
@@ -139,6 +152,47 @@ const Dashboard = ({ connectionStatus }) => {
 
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         {getStatusAlert()}
+
+        {/* Mock服务地址卡片 */}
+        <Card 
+          title={
+            <Space>
+              <LinkOutlined style={{ color: '#1890ff' }} />
+              <span>Mock服务地址</span>
+            </Space>
+          } 
+          className="content-card"
+          extra={
+            <Button 
+              icon={<CopyOutlined />} 
+              size="small" 
+              onClick={handleCopyUrl}
+            >
+              复制地址
+            </Button>
+          }
+        >
+          <div style={{ 
+            padding: '16px', 
+            backgroundColor: '#f6f8fa', 
+            borderRadius: '6px',
+            border: '1px solid #e1e4e8'
+          }}>
+            <Text 
+              code 
+              style={{ 
+                fontSize: '16px', 
+                fontWeight: 'bold',
+                color: '#1890ff'
+              }}
+            >
+              {mockServiceUrl}
+            </Text>
+          </div>
+          <Paragraph style={{ marginTop: '12px', marginBottom: 0, color: '#666' }}>
+            这是您的Mock服务对外访问地址，可以用于API测试和集成。
+          </Paragraph>
+        </Card>
 
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} lg={6}>
@@ -272,7 +326,7 @@ const Dashboard = ({ connectionStatus }) => {
             <li><strong>系统设置:</strong> 配置 WireMock 服务参数</li>
           </ul>
           <Paragraph>
-            确保 WireMock 服务正在运行并可通过 <code>http://localhost:8080</code> 访问。
+            Mock服务地址: <Text code>{mockServiceUrl}</Text>
           </Paragraph>
         </Card>
       </Space>
