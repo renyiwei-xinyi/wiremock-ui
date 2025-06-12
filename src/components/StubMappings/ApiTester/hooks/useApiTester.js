@@ -46,16 +46,18 @@ export const useApiTester = (mockServiceUrl) => {
       // 构建完整URL
       const fullUrl = `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`;
 
-      // 构建请求头
-      const headers = {
-        // 添加默认请求头，避免CORS预检
-        'Content-Type': 'application/json',
-      };
+      // 构建请求头 - 使用简单的请求头避免CORS预检
+      const headers = {};
       
+      // 只有在用户明确设置了Content-Type时才添加，否则让浏览器自动设置
+      let hasContentType = false;
       if (values.headers) {
         values.headers.forEach(header => {
           if (header.name && header.value) {
             headers[header.name] = header.value;
+            if (header.name.toLowerCase() === 'content-type') {
+              hasContentType = true;
+            }
           }
         });
       }
@@ -75,8 +77,16 @@ export const useApiTester = (mockServiceUrl) => {
       if (values.body && ['POST', 'PUT', 'PATCH'].includes(values.method)) {
         try {
           data = JSON.parse(values.body);
+          // 如果是JSON数据且用户没有设置Content-Type，则设置为application/json
+          if (!hasContentType) {
+            headers['Content-Type'] = 'application/json';
+          }
         } catch {
           data = values.body;
+          // 如果是纯文本且用户没有设置Content-Type，则设置为text/plain
+          if (!hasContentType) {
+            headers['Content-Type'] = 'text/plain';
+          }
         }
       }
 
@@ -95,19 +105,26 @@ export const useApiTester = (mockServiceUrl) => {
       console.log('发送请求:', requestInfo);
       console.log('请求方法验证:', values.method, typeof values.method);
 
-      // 创建axios配置
+      // 创建axios配置 - 使用最简单的配置避免CORS预检
       const axiosConfig = {
         method: values.method.toLowerCase(),
         url: fullUrl,
-        headers,
-        params,
         timeout: 30000,
         validateStatus: () => true, // 接受所有状态码
-        // 添加CORS配置
-        withCredentials: false,
+        // 不设置withCredentials，让它保持默认值
       };
 
-      // 只有在有请求体的情况下才添加data
+      // 只在有参数时才添加params
+      if (Object.keys(params).length > 0) {
+        axiosConfig.params = params;
+      }
+
+      // 只在有请求头时才添加headers
+      if (Object.keys(headers).length > 0) {
+        axiosConfig.headers = headers;
+      }
+
+      // 只在有请求体时才添加data
       if (data !== null) {
         axiosConfig.data = data;
       }
@@ -171,8 +188,10 @@ export const useApiTester = (mockServiceUrl) => {
           statusText: error.response.statusText,
           data: error.response.data,
           actualMethod: error.config?.method?.toUpperCase() || 'UNKNOWN',
+          requestUrl: error.config?.url || 'UNKNOWN',
         };
         console.log('服务器响应错误，实际发送的方法:', error.config?.method);
+        console.log('实际请求URL:', error.config?.url);
       } else if (error.request) {
         // 请求已发出但没有收到响应
         errorMessage = '网络错误：无法连接到服务器';
@@ -180,13 +199,16 @@ export const useApiTester = (mockServiceUrl) => {
           code: error.code,
           message: error.message,
           actualMethod: error.config?.method?.toUpperCase() || 'UNKNOWN',
+          requestUrl: error.config?.url || 'UNKNOWN',
         };
         console.log('网络错误，实际发送的方法:', error.config?.method);
+        console.log('实际请求URL:', error.config?.url);
       } else {
         // 请求配置错误
         errorMessage = `请求配置错误: ${error.message}`;
         errorDetails = {
           actualMethod: values.method,
+          requestUrl: `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`,
         };
       }
 
@@ -204,6 +226,7 @@ export const useApiTester = (mockServiceUrl) => {
           url: `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`,
           timestamp: new Date().toISOString(),
           actualMethod: error.config?.method?.toUpperCase() || values.method,
+          actualUrl: error.config?.url || `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`,
         },
       };
 
@@ -222,7 +245,13 @@ export const useApiTester = (mockServiceUrl) => {
       if (error.response?.status === 404 && error.config?.method === 'options') {
         notification.error({
           message: 'CORS预检请求失败',
-          description: '服务器不支持OPTIONS请求，这可能是CORS配置问题。请检查服务器CORS设置。',
+          description: `服务器不支持OPTIONS请求。实际请求: ${error.config?.method?.toUpperCase()} ${error.config?.url}`,
+          duration: 10,
+        });
+      } else if (error.config?.method && error.config.method !== values.method.toLowerCase()) {
+        notification.error({
+          message: '请求方法不匹配',
+          description: `期望发送: ${values.method}, 实际发送: ${error.config.method.toUpperCase()}`,
           duration: 8,
         });
       } else {

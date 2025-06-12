@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   Form,
@@ -38,30 +38,80 @@ const ApiTester = ({ visible, onClose, mapping }) => {
   } = useApiTester(mockServiceUrl);
 
   // 初始化表单数据
-  React.useEffect(() => {
-    if (visible && mapping) {
-      const defaultValues = getDefaultValues(mapping);
+  useEffect(() => {
+    if (visible) {
+      // 重置表单
+      form.resetFields();
+      
+      let defaultValues;
+      if (mapping) {
+        defaultValues = getDefaultValues(mapping);
+        console.log('从mapping初始化表单:', defaultValues);
+      } else {
+        // 如果没有mapping，设置默认值
+        defaultValues = {
+          method: 'GET',
+          url: '/',
+          headers: [],
+          queryParams: [],
+          body: ''
+        };
+        console.log('使用默认值初始化表单:', defaultValues);
+      }
+      
+      // 设置表单值
       form.setFieldsValue(defaultValues);
-    } else if (visible && !mapping) {
-      // 如果没有mapping，设置默认值
-      form.setFieldsValue({
-        method: 'GET',
-        url: '/',
-        headers: [],
-        queryParams: [],
-        body: ''
-      });
+      
+      // 验证表单值是否正确设置
+      setTimeout(() => {
+        const currentValues = form.getFieldsValue();
+        console.log('表单当前值:', currentValues);
+        console.log('method字段值:', currentValues.method, typeof currentValues.method);
+      }, 100);
     }
   }, [visible, mapping, form, getDefaultValues]);
 
   // 发送请求处理
   const handleSendRequest = async () => {
     try {
+      // 先获取当前表单值进行调试
+      const currentValues = form.getFieldsValue();
+      console.log('发送请求前的表单值:', currentValues);
+      console.log('method字段详情:', {
+        value: currentValues.method,
+        type: typeof currentValues.method,
+        isEmpty: !currentValues.method,
+        isUndefined: currentValues.method === undefined,
+        isNull: currentValues.method === null
+      });
+      
       const values = await form.validateFields();
-      console.log('表单值:', values); // 调试日志
+      console.log('验证后的表单值:', values);
+      
+      // 确保method字段有值
+      if (!values.method) {
+        console.error('method字段为空，强制设置为GET');
+        values.method = 'GET';
+        form.setFieldValue('method', 'GET');
+      }
+      
       await sendRequest(values);
     } catch (error) {
       console.error('表单验证失败:', error);
+      
+      // 如果验证失败，尝试获取当前值并设置默认method
+      const currentValues = form.getFieldsValue();
+      if (!currentValues.method) {
+        console.log('设置默认method为GET');
+        form.setFieldValue('method', 'GET');
+        // 重新尝试发送
+        try {
+          const retryValues = await form.validateFields();
+          await sendRequest(retryValues);
+        } catch (retryError) {
+          console.error('重试发送失败:', retryError);
+        }
+      }
     }
   };
 
@@ -89,6 +139,7 @@ const ApiTester = ({ visible, onClose, mapping }) => {
           ) : ''
       };
       
+      console.log('从历史记录设置表单数据:', formData);
       form.setFieldsValue(formData);
       
       // 发送请求
@@ -118,7 +169,18 @@ const ApiTester = ({ visible, onClose, mapping }) => {
       destroyOnClose
     >
       <div style={{ height: '70vh', display: 'flex', flexDirection: 'column' }}>
-        <Form form={form} layout="vertical" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <Form 
+          form={form} 
+          layout="vertical" 
+          style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+          initialValues={{
+            method: 'GET',
+            url: '/',
+            headers: [],
+            queryParams: [],
+            body: ''
+          }}
+        >
           {/* 请求配置区域 */}
           <Card size="small" style={{ marginBottom: 16 }}>
             <RequestConfigSection
