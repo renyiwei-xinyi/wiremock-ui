@@ -17,7 +17,7 @@ import {
 import Editor from '@monaco-editor/react';
 import RequestConfigSection, { DynamicFormList } from './ApiTester/RequestConfigSection';
 import ResponseSection from './ApiTester/ResponseSection';
-import EmbeddedApiTester from './ApiTester/EmbeddedApiTester';
+import AdvancedApiTester from './ApiTester/AdvancedApiTester';
 import { useApiTester } from './ApiTester/hooks/useApiTester';
 
 const { TabPane } = Tabs;
@@ -203,8 +203,8 @@ const ApiTester = ({ visible, onClose, mapping }) => {
         </Card>
 
         {useEmbeddedTool ? (
-          /* 嵌入式专业工具 */
-          <EmbeddedApiTester 
+          /* 高级API测试工具 */
+          <AdvancedApiTester 
             mapping={mapping} 
             mockServiceUrl={mockServiceUrl}
           />
