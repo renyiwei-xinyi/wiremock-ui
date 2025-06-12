@@ -16,7 +16,7 @@ import {
   CheckCircleOutlined,
   LinkOutlined,
   SendOutlined,
-  ReceiveMoneyOutlined,
+  ArrowDownOutlined,
   ApiOutlined
 } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
@@ -253,7 +253,7 @@ const RequestDetail = ({ request }) => {
           </TabPane>
 
           {/* 响应详情 */}
-          <TabPane tab={<Space><ReceiveMoneyOutlined />响应详情</Space>} key="response">
+          <TabPane tab={<Space><ArrowDownOutlined />响应详情</Space>} key="response">
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               {/* 响应头 */}
               {request.response?.headers && (
@@ -298,7 +298,7 @@ const RequestDetail = ({ request }) => {
                     key={index}
                     title={
                       <Space>
-                        {event.type === 'WEBHOOK_REQUEST' ? <SendOutlined /> : <ReceiveMoneyOutlined />}
+                        {event.type === 'WEBHOOK_REQUEST' ? <SendOutlined /> : <ArrowDownOutlined />}
                         {event.type === 'WEBHOOK_REQUEST' ? 'Webhook请求' : 'Webhook响应'}
                         <Text type="secondary">
                           {formatTime(event.data?.loggedDate, event.data?.loggedDateString)}
