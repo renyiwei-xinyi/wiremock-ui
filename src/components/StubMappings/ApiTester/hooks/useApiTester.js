@@ -47,7 +47,11 @@ export const useApiTester = (mockServiceUrl) => {
       const fullUrl = `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`;
 
       // 构建请求头
-      const headers = {};
+      const headers = {
+        // 添加默认请求头，避免CORS预检
+        'Content-Type': 'application/json',
+      };
+      
       if (values.headers) {
         values.headers.forEach(header => {
           if (header.name && header.value) {
@@ -89,17 +93,29 @@ export const useApiTester = (mockServiceUrl) => {
       };
 
       console.log('发送请求:', requestInfo);
+      console.log('请求方法验证:', values.method, typeof values.method);
 
-      // 发送请求
-      const axiosResponse = await axios({
+      // 创建axios配置
+      const axiosConfig = {
         method: values.method.toLowerCase(),
         url: fullUrl,
         headers,
         params,
-        data,
         timeout: 30000,
         validateStatus: () => true, // 接受所有状态码
-      });
+        // 添加CORS配置
+        withCredentials: false,
+      };
+
+      // 只有在有请求体的情况下才添加data
+      if (data !== null) {
+        axiosConfig.data = data;
+      }
+
+      console.log('Axios配置:', axiosConfig);
+
+      // 发送请求
+      const axiosResponse = await axios(axiosConfig);
 
       const endTime = Date.now();
       const duration = endTime - startTime;
@@ -135,6 +151,13 @@ export const useApiTester = (mockServiceUrl) => {
 
     } catch (error) {
       console.error('请求发送失败:', error);
+      console.error('错误详情:', {
+        message: error.message,
+        code: error.code,
+        config: error.config,
+        request: error.request,
+        response: error.response
+      });
       
       // 详细的错误信息
       let errorMessage = error.message;
@@ -147,17 +170,24 @@ export const useApiTester = (mockServiceUrl) => {
           status: error.response.status,
           statusText: error.response.statusText,
           data: error.response.data,
+          actualMethod: error.config?.method?.toUpperCase() || 'UNKNOWN',
         };
+        console.log('服务器响应错误，实际发送的方法:', error.config?.method);
       } else if (error.request) {
         // 请求已发出但没有收到响应
         errorMessage = '网络错误：无法连接到服务器';
         errorDetails = {
           code: error.code,
           message: error.message,
+          actualMethod: error.config?.method?.toUpperCase() || 'UNKNOWN',
         };
+        console.log('网络错误，实际发送的方法:', error.config?.method);
       } else {
         // 请求配置错误
         errorMessage = `请求配置错误: ${error.message}`;
+        errorDetails = {
+          actualMethod: values.method,
+        };
       }
 
       const errorResponse = {
@@ -173,6 +203,7 @@ export const useApiTester = (mockServiceUrl) => {
           method: values.method,
           url: `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`,
           timestamp: new Date().toISOString(),
+          actualMethod: error.config?.method?.toUpperCase() || values.method,
         },
       };
 
@@ -187,11 +218,20 @@ export const useApiTester = (mockServiceUrl) => {
         error: errorMessage,
       }, ...prev.slice(0, 9)]);
 
-      notification.error({
-        message: '请求发送失败',
-        description: errorMessage,
-        duration: 5,
-      });
+      // 特殊处理CORS预检问题
+      if (error.response?.status === 404 && error.config?.method === 'options') {
+        notification.error({
+          message: 'CORS预检请求失败',
+          description: '服务器不支持OPTIONS请求，这可能是CORS配置问题。请检查服务器CORS设置。',
+          duration: 8,
+        });
+      } else {
+        notification.error({
+          message: '请求发送失败',
+          description: errorMessage,
+          duration: 5,
+        });
+      }
 
       return errorResponse;
     } finally {
