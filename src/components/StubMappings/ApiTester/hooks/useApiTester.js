@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { notification } from 'antd';
-import axios from 'axios';
 
 export const useApiTester = (mockServiceUrl) => {
   const [loading, setLoading] = useState(false);
@@ -29,7 +28,7 @@ export const useApiTester = (mockServiceUrl) => {
     };
   };
 
-  // 发送请求
+  // 使用原生fetch API发送请求，避免axios的CORS预检问题
   const sendRequest = async (values) => {
     try {
       setLoading(true);
@@ -44,47 +43,43 @@ export const useApiTester = (mockServiceUrl) => {
       }
 
       // 构建完整URL
-      const fullUrl = `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`;
+      let fullUrl = `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`;
 
-      // 构建请求头 - 使用简单的请求头避免CORS预检
-      const headers = {};
+      // 构建查询参数
+      const urlParams = new URLSearchParams();
+      if (values.queryParams) {
+        values.queryParams.forEach(param => {
+          if (param.name && param.value) {
+            urlParams.append(param.name, param.value);
+          }
+        });
+      }
       
-      // 只有在用户明确设置了Content-Type时才添加，否则让浏览器自动设置
-      let hasContentType = false;
+      if (urlParams.toString()) {
+        fullUrl += '?' + urlParams.toString();
+      }
+
+      // 构建请求头 - 只添加用户明确设置的请求头
+      const headers = {};
       if (values.headers) {
         values.headers.forEach(header => {
           if (header.name && header.value) {
             headers[header.name] = header.value;
-            if (header.name.toLowerCase() === 'content-type') {
-              hasContentType = true;
-            }
-          }
-        });
-      }
-
-      // 构建查询参数
-      const params = {};
-      if (values.queryParams) {
-        values.queryParams.forEach(param => {
-          if (param.name && param.value) {
-            params[param.name] = param.value;
           }
         });
       }
 
       // 构建请求体
-      let data = null;
+      let body = null;
       if (values.body && ['POST', 'PUT', 'PATCH'].includes(values.method)) {
-        try {
-          data = JSON.parse(values.body);
-          // 如果是JSON数据且用户没有设置Content-Type，则设置为application/json
-          if (!hasContentType) {
+        body = values.body;
+        
+        // 只有在用户没有设置Content-Type时才自动设置
+        if (!headers['Content-Type'] && !headers['content-type']) {
+          try {
+            JSON.parse(values.body);
             headers['Content-Type'] = 'application/json';
-          }
-        } catch {
-          data = values.body;
-          // 如果是纯文本且用户没有设置Content-Type，则设置为text/plain
-          if (!hasContentType) {
+          } catch {
             headers['Content-Type'] = 'text/plain';
           }
         }
@@ -97,126 +92,118 @@ export const useApiTester = (mockServiceUrl) => {
         method: values.method,
         url: fullUrl,
         headers,
-        params,
-        data,
+        body,
         timestamp: new Date().toISOString(),
       };
 
-      console.log('发送请求:', requestInfo);
-      console.log('请求方法验证:', values.method, typeof values.method);
+      console.log('=== 发送请求调试信息 ===');
+      console.log('表单原始值:', values);
+      console.log('请求方法:', values.method, typeof values.method);
+      console.log('完整URL:', fullUrl);
+      console.log('请求头:', headers);
+      console.log('请求体:', body);
+      console.log('========================');
 
-      // 创建axios配置 - 使用最简单的配置避免CORS预检
-      const axiosConfig = {
-        method: values.method.toLowerCase(),
-        url: fullUrl,
-        timeout: 30000,
-        validateStatus: () => true, // 接受所有状态码
-        // 不设置withCredentials，让它保持默认值
+      // 使用fetch API发送请求
+      const fetchOptions = {
+        method: values.method,
+        headers: Object.keys(headers).length > 0 ? headers : undefined,
+        body: body,
+        mode: 'cors', // 明确设置CORS模式
+        credentials: 'omit', // 不发送凭据，避免复杂的CORS
       };
 
-      // 只在有参数时才添加params
-      if (Object.keys(params).length > 0) {
-        axiosConfig.params = params;
-      }
+      console.log('Fetch选项:', fetchOptions);
 
-      // 只在有请求头时才添加headers
-      if (Object.keys(headers).length > 0) {
-        axiosConfig.headers = headers;
-      }
-
-      // 只在有请求体时才添加data
-      if (data !== null) {
-        axiosConfig.data = data;
-      }
-
-      console.log('Axios配置:', axiosConfig);
-
-      // 发送请求
-      const axiosResponse = await axios(axiosConfig);
+      const fetchResponse = await fetch(fullUrl, fetchOptions);
 
       const endTime = Date.now();
       const duration = endTime - startTime;
 
+      // 读取响应数据
+      let responseData;
+      const contentType = fetchResponse.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          responseData = await fetchResponse.json();
+        } catch {
+          responseData = await fetchResponse.text();
+        }
+      } else {
+        responseData = await fetchResponse.text();
+      }
+
+      // 构建响应头对象
+      const responseHeaders = {};
+      fetchResponse.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+
       // 处理响应
-      const responseData = {
-        status: axiosResponse.status,
-        statusText: axiosResponse.statusText,
-        headers: axiosResponse.headers,
-        data: axiosResponse.data,
+      const responseObj = {
+        status: fetchResponse.status,
+        statusText: fetchResponse.statusText,
+        headers: responseHeaders,
+        data: responseData,
         duration,
-        size: JSON.stringify(axiosResponse.data).length,
+        size: JSON.stringify(responseData).length,
         timestamp: new Date().toISOString(),
         request: requestInfo,
       };
 
-      setResponse(responseData);
+      setResponse(responseObj);
 
       // 添加到历史记录
       setRequestHistory(prev => [{
         id: Date.now(),
         request: requestInfo,
-        response: responseData,
-        success: true,
+        response: responseObj,
+        success: fetchResponse.ok,
       }, ...prev.slice(0, 9)]); // 保留最近10条记录
 
-      notification.success({
-        message: '请求发送成功',
-        description: `状态码: ${responseData.status}, 耗时: ${duration}ms`,
-      });
+      if (fetchResponse.ok) {
+        notification.success({
+          message: '请求发送成功',
+          description: `状态码: ${responseObj.status}, 耗时: ${duration}ms`,
+        });
+      } else {
+        notification.warning({
+          message: '请求已发送',
+          description: `状态码: ${responseObj.status} ${responseObj.statusText}, 耗时: ${duration}ms`,
+        });
+      }
 
-      return responseData;
+      return responseObj;
 
     } catch (error) {
-      console.error('请求发送失败:', error);
-      console.error('错误详情:', {
-        message: error.message,
-        code: error.code,
-        config: error.config,
-        request: error.request,
-        response: error.response
-      });
+      console.error('=== 请求发送失败 ===');
+      console.error('错误对象:', error);
+      console.error('错误消息:', error.message);
+      console.error('错误类型:', error.name);
+      console.error('==================');
       
       // 详细的错误信息
       let errorMessage = error.message;
-      let errorDetails = {};
+      let errorDetails = {
+        name: error.name,
+        message: error.message,
+        type: 'fetch_error'
+      };
 
-      if (error.response) {
-        // 服务器响应了错误状态码
-        errorMessage = `HTTP ${error.response.status}: ${error.response.statusText}`;
-        errorDetails = {
-          status: error.response.status,
-          statusText: error.response.statusText,
-          data: error.response.data,
-          actualMethod: error.config?.method?.toUpperCase() || 'UNKNOWN',
-          requestUrl: error.config?.url || 'UNKNOWN',
-        };
-        console.log('服务器响应错误，实际发送的方法:', error.config?.method);
-        console.log('实际请求URL:', error.config?.url);
-      } else if (error.request) {
-        // 请求已发出但没有收到响应
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
         errorMessage = '网络错误：无法连接到服务器';
-        errorDetails = {
-          code: error.code,
-          message: error.message,
-          actualMethod: error.config?.method?.toUpperCase() || 'UNKNOWN',
-          requestUrl: error.config?.url || 'UNKNOWN',
-        };
-        console.log('网络错误，实际发送的方法:', error.config?.method);
-        console.log('实际请求URL:', error.config?.url);
-      } else {
-        // 请求配置错误
-        errorMessage = `请求配置错误: ${error.message}`;
-        errorDetails = {
-          actualMethod: values.method,
-          requestUrl: `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`,
-        };
+        errorDetails.type = 'network_error';
+      } else if (error.name === 'AbortError') {
+        errorMessage = '请求超时';
+        errorDetails.type = 'timeout_error';
       }
 
       const errorResponse = {
-        status: error.response?.status || 0,
-        statusText: error.response?.statusText || 'Network Error',
-        headers: error.response?.headers || {},
-        data: error.response?.data || { error: errorMessage, details: errorDetails },
+        status: 0,
+        statusText: 'Network Error',
+        headers: {},
+        data: { error: errorMessage, details: errorDetails },
         duration: 0,
         size: 0,
         timestamp: new Date().toISOString(),
@@ -225,8 +212,6 @@ export const useApiTester = (mockServiceUrl) => {
           method: values.method,
           url: `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`,
           timestamp: new Date().toISOString(),
-          actualMethod: error.config?.method?.toUpperCase() || values.method,
-          actualUrl: error.config?.url || `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`,
         },
       };
 
@@ -241,26 +226,11 @@ export const useApiTester = (mockServiceUrl) => {
         error: errorMessage,
       }, ...prev.slice(0, 9)]);
 
-      // 特殊处理CORS预检问题
-      if (error.response?.status === 404 && error.config?.method === 'options') {
-        notification.error({
-          message: 'CORS预检请求失败',
-          description: `服务器不支持OPTIONS请求。实际请求: ${error.config?.method?.toUpperCase()} ${error.config?.url}`,
-          duration: 10,
-        });
-      } else if (error.config?.method && error.config.method !== values.method.toLowerCase()) {
-        notification.error({
-          message: '请求方法不匹配',
-          description: `期望发送: ${values.method}, 实际发送: ${error.config.method.toUpperCase()}`,
-          duration: 8,
-        });
-      } else {
-        notification.error({
-          message: '请求发送失败',
-          description: errorMessage,
-          duration: 5,
-        });
-      }
+      notification.error({
+        message: '请求发送失败',
+        description: errorMessage,
+        duration: 5,
+      });
 
       return errorResponse;
     } finally {
@@ -291,8 +261,8 @@ export const useApiTester = (mockServiceUrl) => {
       }
       
       // 添加请求体
-      if (req.data) {
-        curl += ` -d '${typeof req.data === 'string' ? req.data : JSON.stringify(req.data)}'`;
+      if (req.body) {
+        curl += ` -d '${req.body}'`;
       }
       
       navigator.clipboard.writeText(curl).then(() => {
@@ -305,18 +275,14 @@ export const useApiTester = (mockServiceUrl) => {
   const resendFromHistory = (historyItem) => {
     return sendRequest({
       method: historyItem.request.method,
-      url: historyItem.request.url.replace(mockServiceUrl, ''),
+      url: historyItem.request.url.replace(mockServiceUrl, '').split('?')[0], // 移除查询参数
       headers: Object.entries(historyItem.request.headers || {}).map(([name, value]) => ({
         key: Math.random().toString(36).substr(2, 9),
         name,
         value
       })),
-      queryParams: Object.entries(historyItem.request.params || {}).map(([name, value]) => ({
-        key: Math.random().toString(36).substr(2, 9),
-        name,
-        value
-      })),
-      body: historyItem.request.data ? (typeof historyItem.request.data === 'string' ? historyItem.request.data : JSON.stringify(historyItem.request.data, null, 2)) : ''
+      queryParams: [], // 暂时简化，不从URL中解析查询参数
+      body: historyItem.request.body || ''
     });
   };
 
