@@ -25,13 +25,32 @@ const ApiTester = ({ visible, onClose, mapping }) => {
   const mockServiceUrl = 'http://os.wiremock.server.qa.17u.cn';
 
   // 使用自定义Hook
-  const { loading, response, sendRequest, copyResponse, getDefaultValues } = useApiTester(mockServiceUrl);
+  const { 
+    loading, 
+    response, 
+    requestHistory,
+    sendRequest, 
+    copyResponse, 
+    copyAsCurl,
+    resendFromHistory,
+    clearHistory,
+    getDefaultValues 
+  } = useApiTester(mockServiceUrl);
 
   // 初始化表单数据
   React.useEffect(() => {
     if (visible && mapping) {
       const defaultValues = getDefaultValues(mapping);
       form.setFieldsValue(defaultValues);
+    } else if (visible && !mapping) {
+      // 如果没有mapping，设置默认值
+      form.setFieldsValue({
+        method: 'GET',
+        url: '/',
+        headers: [],
+        queryParams: [],
+        body: ''
+      });
     }
   }, [visible, mapping, form, getDefaultValues]);
 
@@ -39,9 +58,43 @@ const ApiTester = ({ visible, onClose, mapping }) => {
   const handleSendRequest = async () => {
     try {
       const values = await form.validateFields();
+      console.log('表单值:', values); // 调试日志
       await sendRequest(values);
     } catch (error) {
       console.error('表单验证失败:', error);
+    }
+  };
+
+  // 从历史记录重新发送请求
+  const handleResendFromHistory = async (historyItem) => {
+    try {
+      // 更新表单数据
+      const formData = {
+        method: historyItem.request.method,
+        url: historyItem.request.url.replace(mockServiceUrl, ''),
+        headers: Object.entries(historyItem.request.headers || {}).map(([name, value]) => ({
+          key: Math.random().toString(36).substr(2, 9),
+          name,
+          value
+        })),
+        queryParams: Object.entries(historyItem.request.params || {}).map(([name, value]) => ({
+          key: Math.random().toString(36).substr(2, 9),
+          name,
+          value
+        })),
+        body: historyItem.request.data ? 
+          (typeof historyItem.request.data === 'string' ? 
+            historyItem.request.data : 
+            JSON.stringify(historyItem.request.data, null, 2)
+          ) : ''
+      };
+      
+      form.setFieldsValue(formData);
+      
+      // 发送请求
+      await resendFromHistory(historyItem);
+    } catch (error) {
+      console.error('重新发送请求失败:', error);
     }
   };
 
@@ -104,6 +157,10 @@ const ApiTester = ({ visible, onClose, mapping }) => {
             response={response}
             loading={loading}
             onCopyResponse={copyResponse}
+            requestHistory={requestHistory}
+            onCopyAsCurl={copyAsCurl}
+            onResendFromHistory={handleResendFromHistory}
+            onClearHistory={clearHistory}
           />
         </Form>
       </div>

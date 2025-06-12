@@ -39,8 +39,12 @@ const DynamicFormList = ({ name, placeholder }) => (
 const RequestConfigSection = ({ form, onSendRequest, loading, mockServiceUrl }) => {
   return (
     <Space.Compact style={{ width: '100%', marginBottom: 16 }}>
-      <Form.Item name="method" style={{ margin: 0 }}>
-        <Select style={{ width: 100 }}>
+      <Form.Item 
+        name="method" 
+        style={{ margin: 0 }}
+        initialValue="GET"
+      >
+        <Select style={{ width: 100 }} placeholder="方法">
           <Option value="GET">GET</Option>
           <Option value="POST">POST</Option>
           <Option value="PUT">PUT</Option>
@@ -50,7 +54,11 @@ const RequestConfigSection = ({ form, onSendRequest, loading, mockServiceUrl }) 
           <Option value="OPTIONS">OPTIONS</Option>
         </Select>
       </Form.Item>
-      <Form.Item name="url" style={{ margin: 0, flex: 1 }}>
+      <Form.Item 
+        name="url" 
+        style={{ margin: 0, flex: 1 }}
+        rules={[{ required: true, message: '请输入请求URL' }]}
+      >
         <Input 
           placeholder="/api/example" 
           addonBefore={<span style={{ fontSize: '12px', fontFamily: 'monospace' }}>{mockServiceUrl}</span>}

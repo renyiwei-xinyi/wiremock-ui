@@ -5,10 +5,11 @@ import axios from 'axios';
 export const useApiTester = (mockServiceUrl) => {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState(null);
+  const [requestHistory, setRequestHistory] = useState([]);
 
   // 从mapping中提取默认值
   const getDefaultValues = (mapping) => {
-    if (!mapping) return {};
+    if (!mapping) return { method: 'GET', url: '/', headers: [], queryParams: [], body: '' };
     
     const request = mapping.request || {};
     return {
@@ -33,6 +34,14 @@ export const useApiTester = (mockServiceUrl) => {
     try {
       setLoading(true);
       setResponse(null);
+
+      // 验证必要字段
+      if (!values.method) {
+        throw new Error('请选择请求方法');
+      }
+      if (!values.url) {
+        throw new Error('请输入请求URL');
+      }
 
       // 构建完整URL
       const fullUrl = `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`;
@@ -69,6 +78,18 @@ export const useApiTester = (mockServiceUrl) => {
 
       const startTime = Date.now();
 
+      // 记录请求信息用于调试
+      const requestInfo = {
+        method: values.method,
+        url: fullUrl,
+        headers,
+        params,
+        data,
+        timestamp: new Date().toISOString(),
+      };
+
+      console.log('发送请求:', requestInfo);
+
       // 发送请求
       const axiosResponse = await axios({
         method: values.method.toLowerCase(),
@@ -92,9 +113,18 @@ export const useApiTester = (mockServiceUrl) => {
         duration,
         size: JSON.stringify(axiosResponse.data).length,
         timestamp: new Date().toISOString(),
+        request: requestInfo,
       };
 
       setResponse(responseData);
+
+      // 添加到历史记录
+      setRequestHistory(prev => [{
+        id: Date.now(),
+        request: requestInfo,
+        response: responseData,
+        success: true,
+      }, ...prev.slice(0, 9)]); // 保留最近10条记录
 
       notification.success({
         message: '请求发送成功',
@@ -106,22 +136,61 @@ export const useApiTester = (mockServiceUrl) => {
     } catch (error) {
       console.error('请求发送失败:', error);
       
+      // 详细的错误信息
+      let errorMessage = error.message;
+      let errorDetails = {};
+
+      if (error.response) {
+        // 服务器响应了错误状态码
+        errorMessage = `HTTP ${error.response.status}: ${error.response.statusText}`;
+        errorDetails = {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+        };
+      } else if (error.request) {
+        // 请求已发出但没有收到响应
+        errorMessage = '网络错误：无法连接到服务器';
+        errorDetails = {
+          code: error.code,
+          message: error.message,
+        };
+      } else {
+        // 请求配置错误
+        errorMessage = `请求配置错误: ${error.message}`;
+      }
+
       const errorResponse = {
         status: error.response?.status || 0,
         statusText: error.response?.statusText || 'Network Error',
         headers: error.response?.headers || {},
-        data: error.response?.data || { error: error.message },
+        data: error.response?.data || { error: errorMessage, details: errorDetails },
         duration: 0,
         size: 0,
         timestamp: new Date().toISOString(),
         error: true,
+        request: {
+          method: values.method,
+          url: `${mockServiceUrl}${values.url.startsWith('/') ? values.url : '/' + values.url}`,
+          timestamp: new Date().toISOString(),
+        },
       };
 
       setResponse(errorResponse);
 
+      // 添加到历史记录
+      setRequestHistory(prev => [{
+        id: Date.now(),
+        request: errorResponse.request,
+        response: errorResponse,
+        success: false,
+        error: errorMessage,
+      }, ...prev.slice(0, 9)]);
+
       notification.error({
         message: '请求发送失败',
-        description: error.message,
+        description: errorMessage,
+        duration: 5,
       });
 
       return errorResponse;
@@ -139,11 +208,64 @@ export const useApiTester = (mockServiceUrl) => {
     }
   };
 
+  // 复制请求为cURL命令
+  const copyAsCurl = () => {
+    if (response && response.request) {
+      const req = response.request;
+      let curl = `curl -X ${req.method} '${req.url}'`;
+      
+      // 添加请求头
+      if (req.headers && Object.keys(req.headers).length > 0) {
+        Object.entries(req.headers).forEach(([key, value]) => {
+          curl += ` -H '${key}: ${value}'`;
+        });
+      }
+      
+      // 添加请求体
+      if (req.data) {
+        curl += ` -d '${typeof req.data === 'string' ? req.data : JSON.stringify(req.data)}'`;
+      }
+      
+      navigator.clipboard.writeText(curl).then(() => {
+        notification.success({ message: 'cURL命令已复制到剪贴板' });
+      });
+    }
+  };
+
+  // 从历史记录重新发送请求
+  const resendFromHistory = (historyItem) => {
+    return sendRequest({
+      method: historyItem.request.method,
+      url: historyItem.request.url.replace(mockServiceUrl, ''),
+      headers: Object.entries(historyItem.request.headers || {}).map(([name, value]) => ({
+        key: Math.random().toString(36).substr(2, 9),
+        name,
+        value
+      })),
+      queryParams: Object.entries(historyItem.request.params || {}).map(([name, value]) => ({
+        key: Math.random().toString(36).substr(2, 9),
+        name,
+        value
+      })),
+      body: historyItem.request.data ? (typeof historyItem.request.data === 'string' ? historyItem.request.data : JSON.stringify(historyItem.request.data, null, 2)) : ''
+    });
+  };
+
+  // 清空历史记录
+  const clearHistory = () => {
+    setRequestHistory([]);
+    notification.success({ message: '历史记录已清空' });
+  };
+
   return {
     loading,
     response,
+    requestHistory,
     sendRequest,
     copyResponse,
+    copyAsCurl,
+    resendFromHistory,
+    clearHistory,
     getDefaultValues,
   };
 };
