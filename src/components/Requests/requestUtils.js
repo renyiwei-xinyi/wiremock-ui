@@ -80,7 +80,9 @@ export const getTableColumns = () => [
     title: '头部值', 
     dataIndex: 'value', 
     key: 'value', 
-    render: (text) => <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{text}</span>
+    render: (text) => React.createElement('span', {
+      style: { fontFamily: 'monospace', fontSize: '12px' }
+    }, text)
   }
 ];
 
@@ -90,6 +92,8 @@ export const getParamTableColumns = () => [
     title: '参数值', 
     dataIndex: 'value', 
     key: 'value', 
-    render: (text) => <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{text}</span>
+    render: (text) => React.createElement('span', {
+      style: { fontFamily: 'monospace', fontSize: '12px' }
+    }, text)
   }
 ];
