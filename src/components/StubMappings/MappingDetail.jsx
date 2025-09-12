@@ -44,7 +44,7 @@ const MappingDetail = ({ mapping }) => {
           {mapping.requiredScenarioState || '-'} → {mapping.newScenarioState || '-'}
         </Descriptions.Item>
         <Descriptions.Item label="备注" span={2}>
-          {mapping.comment || '-'}
+          {mapping.metadata?.wmui?.description || '-'}
         </Descriptions.Item>
       </Descriptions>
 

@@ -5,7 +5,11 @@ export const getDefaultFormValues = () => ({
   scenarioName: '',
   requiredScenarioState: '',
   newScenarioState: '',
-  comment: '',
+  metadata: {
+    wmui: {
+      description: ''
+    }
+  },
   request: {
     method: 'GET',
     urlPath: '/',
@@ -38,7 +42,11 @@ export const mapRecordToFormData = (record) => {
     scenarioName: record.scenarioName || '',
     requiredScenarioState: record.requiredScenarioState || '',
     newScenarioState: record.newScenarioState || '',
-    comment: record.comment || record.metadata?.wmui?.description || '',
+    metadata: {
+      wmui: {
+        description: record.metadata?.wmui?.description || ''
+      }
+    },
     request: {
       method: record.request?.method || 'GET',
       urlPath: record.request?.urlPath || record.request?.url || '/',

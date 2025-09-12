@@ -24,13 +24,25 @@ export const useMappingOperations = (fetchMappings) => {
   // 保存映射
   const handleSave = async (values, selectedMapping) => {
     try {
+      // 处理metadata字段
+      let metadata = values.metadata || {};
+      if (values.metadata?.wmui?.description) {
+        metadata = {
+          ...metadata,
+          wmui: {
+            ...metadata.wmui,
+            description: values.metadata.wmui.description
+          }
+        };
+      }
+
       const cleanedValues = {
         name: values.name || undefined,
         priority: values.priority || undefined,
         scenarioName: values.scenarioName || undefined,
         requiredScenarioState: values.requiredScenarioState || undefined,
         newScenarioState: values.newScenarioState || undefined,
-        comment: values.comment || undefined,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         request: {
           method: values.request.method,
           urlPath: values.request.urlPath || undefined,
@@ -99,7 +111,7 @@ export const useMappingOperations = (fetchMappings) => {
       });
       return false; // 表示操作失败
     }
-  };
+    };
 
   return {
     handleDelete,

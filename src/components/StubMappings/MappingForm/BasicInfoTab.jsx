@@ -37,7 +37,7 @@ const BasicInfoTab = () => {
         </Col>
       </Row>
       
-      <Form.Item label="备注" name="comment">
+      <Form.Item label="备注" name={['metadata', 'wmui', 'description']}>
         <TextArea rows={3} placeholder="输入映射的详细说明..." />
       </Form.Item>
     </>

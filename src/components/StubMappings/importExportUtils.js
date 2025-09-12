@@ -139,6 +139,7 @@ export const filterMappings = (mappings, searchText) => {
     mapping.request?.urlEqualTo?.toLowerCase().includes(searchLower) ||
     mapping.request?.method?.toLowerCase().includes(searchLower) ||
     mapping.name?.toLowerCase().includes(searchLower) ||
-    mapping.comment?.toLowerCase().includes(searchLower)
+    mapping.comment?.toLowerCase().includes(searchLower) ||
+    mapping.metadata?.wmui?.description?.toLowerCase().includes(searchLower)
   ));
 };

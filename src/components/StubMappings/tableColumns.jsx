@@ -52,9 +52,9 @@ export const createColumns = (handlers) => {
           }}>
             {text || `${record.request?.method} ${record.request?.urlPath || record.request?.urlPathPattern}`}
           </div>
-          {record.comment && (
+          {record.metadata?.wmui?.description && (
             <Text type="secondary" style={{ fontSize: '12px' }}>
-              {record.comment}
+              {record.metadata?.wmui?.description}
             </Text>
           )}
         </div>
